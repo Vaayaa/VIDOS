@@ -40,6 +40,7 @@ When you're ready to take the show on the road and/or open your creations up to 
 0. flash rasbian
 8. git clone https://github.com/teafella/VidBoi
 59. sudo apt-get install libsoil-dev
+5. install wiringPI: http://wiringpi.com/download-and-install/
 
 
 # OPTIONAL Setup
