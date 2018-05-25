@@ -10,6 +10,7 @@
 #include <fstream>
 
 #include <linux/input.h>
+#include <sys/inotify.h>
 
 //gl Includes
 #include "bcm_host.h"
@@ -24,7 +25,7 @@
 #include <time.h>
 #define NUM_SCENES 5
 #define IMAGE_SIZE 128
-#define PATH "/home/pi/Desktop/VidBoi/" //directory of this sketch
+
 #define IN_TEX_NAME "/images/pusheen.png"
 #define CONTEXT_DIV 1000
 
@@ -51,6 +52,7 @@ typedef struct
    GLint inputValY = 0;
    GLint inputValX = 0;
    GLint sceneIndex = 1;
+   GLfloat inputCV0List[CV_LIST_SIZE] = {0}; 
    GLfloat inputCV0 = 0.0;
    GLfloat inputCV1 = 0.0;
    GLfloat inputCV2 = 0.;
@@ -59,15 +61,16 @@ typedef struct
    GLuint fshader;
    GLuint mshader;
    GLuint program;
-   GLuint tex_fb;
+   GLuint tex_fb = 1; // framebuffer at index 1
    GLuint tex[3];
+   GLuint cvtex;
    GLuint buf;
    
    unsigned char* fb_buf;
    unsigned char* tex_buf;
    int buf_height, buf_width;
 // my shader attribs
-   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texFB, unif_texIN, unif_cv0, unif_cv1,unif_cv2, unif_fft; 
+   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texFB, unif_texIN, unif_cvtex, unif_cv0, unif_cv1,unif_cv2, unif_fft; 
    GLuint unif_inputVal, unif_sceneIndex;
    
    GLuint unif_time;
@@ -75,7 +78,14 @@ typedef struct
 
 static CUBE_STATE_T _state, *state=&_state;
 
-#define check() assert(glGetError() == 0)
+#define check() if(glGetError() != 0) std::cout << "GL ERROR on line: "<< __LINE__ <<std::endl; assert(glGetError() == 0); 
+
+static void checkFramebuffer(){
+  GLenum ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if(ret != GL_FRAMEBUFFER_COMPLETE){
+    std::cout<< " Framebuffer issue "<<ret <<   std::endl; 
+  }
+}
 
 static void showlog(GLint shader)
 {
@@ -91,6 +101,15 @@ static void showprogramlog(GLint shader)
    char log[1024];
    glGetProgramInfoLog(shader,sizeof log,NULL,log);
    printf("%d:program:\n%s\n", shader, log);
+}
+
+static std::string getExecutablePath(){
+  char buf[255] = "";
+  readlink("/proc/self/exe", buf, sizeof(buf) );
+  std::string path = std::string(buf);
+  int position = path.rfind ('/');
+  path = path.substr(0, position) + "/";
+  return path;
 }
 
 
@@ -228,7 +247,7 @@ static void load_tex_images(CUBE_STATE_T *state)
 {
 	SOIL_free_image_data(state->tex_buf);
 	//SOIL LOADER
-	state->tex_buf = SOIL_load_image((std::string(PATH) + std::string(IN_TEX_NAME)).c_str(), &state->buf_width, &state->buf_height,0, SOIL_LOAD_RGB);
+	state->tex_buf = SOIL_load_image(( getExecutablePath() + std::string(IN_TEX_NAME)).c_str(), &state->buf_width, &state->buf_height,0, SOIL_LOAD_RGB);
 	
 	if( 0 == state->tex_buf)
 	{
@@ -249,8 +268,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
    
    //TODO: Automatically read files in Shaders/ directory
    //load up the shader files
-   std::string vertShaderStr = readFile((std::string(PATH) + "vshader.vert").c_str());
-    std::string fragShaderStr = readFile((std::string(PATH) + "/Shaders/myShader" + std::to_string(state->sceneIndex) + ".frag").c_str()); 
+   std::string vertShaderStr = readFile((getExecutablePath() + "vshader.vert").c_str());
+    std::string fragShaderStr = readFile((getExecutablePath() + "/Shaders/myShader" + std::to_string(state->sceneIndex) + ".frag").c_str()); 
     const char *vertShaderSrc = vertShaderStr.c_str();
     const char *fragShaderSrc = fragShaderStr.c_str();
    
@@ -306,6 +325,7 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         state->unif_time = glGetUniformLocation(state->program, "time");
         state->unif_inputVal = glGetUniformLocation(state->program, "inputVal");
         state->unif_sceneIndex = glGetUniformLocation(state->program, "sceneIndex");
+        state-> unif_cvtex = glGetUniformLocation(state->program, "cvtex");
         state->unif_cv0 = glGetUniformLocation(state->program, "cv0");
          state->unif_cv1 = glGetUniformLocation(state->program, "cv1");
          state->unif_cv2 = glGetUniformLocation(state->program, "cv2");
@@ -325,20 +345,25 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
 
         // Prepare a texture image
         if(!firstrun){
-			glDeleteTextures(3,  &state->tex[0]);
-		}
+			     glDeleteTextures(3,  &state->tex[0]);
+		    }
         glGenTextures(2, &state->tex[0]);
         check();
         glBindTexture(GL_TEXTURE_2D,state->tex[0]);
         check();
         
         
-        
         glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,state->screen_width / CONTEXT_DIV ,state->screen_height/ CONTEXT_DIV ,0,GL_RGB,GL_UNSIGNED_SHORT_5_6_5,0);
         check();
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         check();
+
+        //init CV texture
+        glGenTextures(1, &state->cvtex);
+        check();
+        glBindTexture(GL_TEXTURE_2D, state->cvtex);
+        //end cv texture init
         
         // setup input textures
 			SOIL_free_image_data(state->fb_buf);
@@ -365,12 +390,14 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         if(!firstrun){
 			glDeleteFramebuffers(1, &state->tex_fb);
 		}
-        glGenFramebuffers(1,&state->tex_fb);
+
+        glGenFramebuffers(1, &state->tex_fb);
         check();
-        glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb);
+        glBindFramebuffer(GL_FRAMEBUFFER, state->tex_fb);
         check();
         glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,state->tex[0],0);
         check();
+               checkFramebuffer();
         glBindFramebuffer(GL_FRAMEBUFFER,0);
         check();
         // Prepare viewport
@@ -386,14 +413,19 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         check();
 }
 
+
+
         
 static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat scale)
 {
+
 		//render to a texture
-        //~ glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb); //ping pong here for framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb); //ping pong here for framebuffer
         // Clear the background (not really necessary I suppose)
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        //glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        //
+        //checkFramebuffer();
         check();
         
         glBindBuffer(GL_ARRAY_BUFFER, state->buf);
@@ -406,14 +438,26 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glUniform2f(state->unif_inputVal, state->inputValX, state->inputValY);
         //pass sceneIndex into shader
         glUniform1i( state->unif_sceneIndex, state->sceneIndex);
-        
-        
-        
+        //pass CVs into shader
         state->inputCV0 = abs( inputs.getCV(0) + inputs.getPot(0) );
         state->inputCV1 = abs( inputs.getCV(1) + inputs.getPot(1) );
-        
-        state->inputCV2 = abs(inputs.getCV(2) + inputs.getPot(2) );
-        
+        state->inputCV2 = abs( inputs.getCV(2) + inputs.getPot(2) );
+        //copy CV list into uniform array
+        std::list<float> cv0list = inputs.getCVList(0);
+        int counter = 0;
+        for (std::list<float>::iterator it = cv0list.begin(); it != cv0list.end(); ++it){
+          //std::cout << *it << " ";
+          if(counter < CV_LIST_SIZE){
+              state->inputCV0List[counter] = *it;
+          }
+          else{
+            break;
+          }
+          ++counter;
+        }
+        //std::cout << std::endl;
+
+        glUniform1f(state->unif_cvtex, state->cvtex);
         glUniform1f(state->unif_cv0, state->inputCV0);
         glUniform1f(state->unif_cv1, state->inputCV1);
         glUniform1f(state->unif_cv2, state->inputCV2);
@@ -434,7 +478,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         
         glDrawArrays ( GL_TRIANGLE_FAN, 0, 4 );
         check();
-
+        checkFramebuffer();
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glFlush();
@@ -453,6 +497,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glBindBuffer(GL_ARRAY_BUFFER, state->buf);
         check();
         
+
         glDrawArrays ( GL_TRIANGLE_FAN, 0, 4 );
         check();
 			
@@ -552,9 +597,9 @@ bool setupKeyboard(){
 bool readKeyboard(){
 	struct input_event ev;
 	ssize_t n;
-	if(keyboardFd == -1){
-		setupKeyboard();
-	}
+	// if(keyboardFd == -1){
+	// 	setupKeyboard();
+	// }
 	
 	n = read(keyboardFd, &ev, sizeof ev);
     if (n == (ssize_t)-1) {
@@ -606,7 +651,7 @@ void destroyShader(){
 
 int main ()
 {
-	
+
    int terminate = 0;
    GLfloat cx, cy;
    bcm_host_init();

@@ -11,6 +11,7 @@ uniform int sceneIndex;
 uniform sampler2D tex;
 uniform sampler2D texFB;
 uniform sampler2D texIN;
+uniform sampler2D cvtex;
 
 #define PI 3.14159265358979323846
 #define TWO_PI 6.28318530718
@@ -118,9 +119,7 @@ void etchMain(){
 			color = color + texColor * (0.87 + cv2 * 0.10);
 		}
 	}
-	
-	//color= texColor;
-	
+
 	//~ vec3 color = vec3(box(pos , size, .0) + center)  - vec3( circle(pos , cv0 ) ) ;
 	
 	gl_FragColor = vec4( color, 1.0 );
@@ -218,10 +217,14 @@ void vaporMain(){
 	gl_FragColor = vec4(color, 1.0);
 }
 
-void buzzGlitchMain(){
+void etch2Main(){
 	vec2 st = vec2(tcoord.x, tcoord.y);
-	
-	vec3 color = vec3( 0.,0.,0.);
+
+	//float block = st.x/10.;
+	float red = 10. * 0.5;
+	// int i = 1; //int(red);
+	// red = cv0list[];
+	vec3 color = vec3( .5, 0.,0.);
 	
 	
 	gl_FragColor = vec4(color, 1.0);
@@ -230,5 +233,5 @@ void buzzGlitchMain(){
 
 
 void main( void ) {
-	etchMain();
+	etch2Main();
 }

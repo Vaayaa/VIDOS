@@ -138,9 +138,10 @@ bool Input::readSerial(){
 						}
 						
 						if(index < 10){//cv input
-							inputMutex.lock();
-							cvIn[index] = val/1024.0;
-							inputMutex.unlock();
+							//inputMutex.lock();
+							setCV(index, val/1024.0);
+							//cvIn[index] = val/1024.0;
+							//inputMutex.unlock();
 						}
 						else if (index >= 10 && index < 20){ //knob input
 							inputMutex.lock();
@@ -183,6 +184,17 @@ bool Input::setupSerial(){
     return true;
 } 
 
+void Input::setCV(int index, float val){
+	inputMutex.lock();
+	clock_t readtime = clock();
+	cvIn[index] = val;
+	lastCV[index].push_front(val);
+	lastCV[index].pop_back();
+	//save time when the read was performed
+	lastCVRead[index] = (float) readtime / (CLOCKS_PER_SEC);
+	inputMutex.unlock();
+}
+
 float Input::getCV(int i){
 	float ret;
 	Input::inputMutex.lock();
@@ -195,6 +207,14 @@ float Input::getPot(int i){
 	float ret;
 	Input::inputMutex.lock();
 	ret = potIn[i];
+	Input::inputMutex.unlock();
+	return ret;
+}
+
+std::list<float> Input::getCVList(int index){
+	std::list<float> ret;
+	Input::inputMutex.lock();
+	ret = std::list<float>(lastCV[index]);
 	Input::inputMutex.unlock();
 	return ret;
 }
