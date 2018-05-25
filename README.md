@@ -40,10 +40,7 @@ When you're ready to take the show on the road and/or open your creations up to 
 0. flash rasbian
 8. git clone https://github.com/teafella/VidBoi
 59. sudo apt-get install libsoil-dev
-
-#Hardware (Dev Notes)
-
-![VMCP3008](https://github.com/teafella/VidBoi/blob/master/images/MCP3008pinout.gif)
+5. install wiringPI: http://wiringpi.com/download-and-install/
 
 
 # OPTIONAL Setup
@@ -51,7 +48,7 @@ When you're ready to take the show on the road and/or open your creations up to 
 ## Creating a Headless Raspberry Pi Zero (Ez Dev Ready Rig)
 
 ### Gear
-- Zero
+- Pi Zero
 - Micro USB cable
 - Yurr Laptop
 
@@ -62,6 +59,11 @@ When you're ready to take the show on the road and/or open your creations up to 
 		OSX Guide: https://stevegrunwell.com/blog/raspberry-pi-zero-share-internet/
 3. Log in with VNC: 
 		Instructions: https://raspberrypi.stackexchange.com/questions/13986/how-to-have-remote-desktop-on-macbook-with-raspberry-pi
+
+# Hardware (Dev Notes)
+
+### MCP3008 Pinout
+![VMCP3008](https://github.com/teafella/VidBoi/blob/master/images/MCP3008Pinout.gif)
 
 
 ## About The Creator
