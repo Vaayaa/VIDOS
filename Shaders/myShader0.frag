@@ -8,10 +8,10 @@ uniform float cv2;
 varying vec2 tcoord;
 uniform float time;
 uniform int sceneIndex;
-uniform sampler2D tex;
+
 uniform sampler2D texFB;
+uniform sampler2D texCV;
 uniform sampler2D texIN;
-uniform sampler2D cvtex;
 
 #define PI 3.14159265358979323846
 #define TWO_PI 6.28318530718
@@ -111,7 +111,7 @@ void etchMain(){
 	
 	vec3 texColor = texture2D( texFB, vec2(pos.x*2., pos.y*2.) ).xyz;
 	
-	vec3 color = vec3(horizontalLine(pos, cv0, 0.05  , linecolor)  + verticalLine( pos, cv1, 0.05 , linecolor));
+	vec3 color = vec3(horizontalLine(pos, cv0, 0.05  , linecolor)  + verticalLine( pos, 0., 0.05 , linecolor));
 	
 	//TODO: feedback needs to be fixed (currently only feeding back a fraction of the resulting buffer when dividing rendering context)
 	if (texColor.x > 0.8 || texColor.y >.8 || texColor.z > .8){
@@ -121,6 +121,7 @@ void etchMain(){
 	}
 
 	//~ vec3 color = vec3(box(pos , size, .0) + center)  - vec3( circle(pos , cv0 ) ) ;
+
 	
 	gl_FragColor = vec4( color, 1.0 );
 }
@@ -213,24 +214,54 @@ void vaporMain(){
 	//~ }
 	color += imgColor;
 	
-	
 	gl_FragColor = vec4(color, 1.0);
 }
+
+vec2 toPolar(vec2 st){ // Outputs distance 0 to 1 and Thet
+	st = st *2.-1.;
+
+  // Angle and radius from the current pixel
+	float ang = ( atan(st.y,st.x) + PI ) / TWO_PI; // angle is scaled so you can use this to adress stuff and be more shader like
+	float rad = sqrt(dot(st,st)) ;
+
+	st = vec2(ang, rad);
+  
+	// ang = cos(ang) + (tcoord.x * (cv2-0.5) * 2.);
+	// rad = rad * sin(cv1 * PI/2. );
+	
+	// st = fract(vec2(0.1/rad, ang/PI) * (10. * cv0));
+
+	return st; 
+}
+
+#define POLAR 0
 
 void etch2Main(){
-	vec2 st = vec2(tcoord.x, tcoord.y);
+	vec3 texColor = vec3(0.);
 
-	//float block = st.x/10.;
-	float red = 10. * 0.5;
-	// int i = 1; //int(red);
-	// red = cv0list[];
-	vec3 color = vec3( .5, 0.,0.);
+	//vec3 center = vec3(cv0 /0.5 ,cv1/0.5, cv2/0.5);
+	vec2 pos = vec2(tcoord.x, tcoord.y) ;
+	vec2 swappedPos = vec2( tcoord.y, tcoord.x);
+
+	//Rotation control for UV in (TODO: rotation per osc)
+	vec2 rotationPos = rotate2D(pos, clamp(cv1*1.2-0.1, 0., 1.) * -TWO_PI);
+
+	vec2 polarPos = toPolar(rotationPos) ;
+	vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
+	polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
+
+	vec2 texPos = mix(rotationPos, polarPos, clamp(cv0*1.1, 0., 1.)  );
+
+	texColor = texture2D( texCV, texPos ).xyz;
 	
+	vec3 fbColor = texture2D( texFB, vec2(pos.x  , pos.y) ).xyz;
+
+	vec3 color = texColor + (fbColor * (cv2/2.)); //+ vec3(cv0, cv1, cv2) ;
+	//color = vec3( cos(polarPos.x  ) );
 	
-	gl_FragColor = vec4(color, 1.0);
+	gl_FragColor = vec4( color, 1.0 );
 	
 }
-
 
 void main( void ) {
 	etch2Main();

@@ -16,9 +16,11 @@
 Input::Input(){
 	onButton = 0;
 	if(useSerial){
+		std::cout<< "Using Serial (Arduino) for Input." <<std::endl;
 		setupSerial();
 	}
 	else{
+		std::cout<< "Using MCP3008 for Input." <<std::endl;
 		setupADC();
 	}
 }
@@ -77,25 +79,26 @@ bool Input::readADC(){
 			else if(chan < 6){
 				//~ smoothVal = smooth(val, lastCV[chan-3]);
 				//~ if(smoothVal != -1){
-					//~ inputMutex.lock();
+					 //~ inputMutex.lock();
 					//~ cvIn[chan-3] = val/1024.0;
 					//~ inputMutex.unlock();
-					//~ lastCV[chan-3] = val;
+					//lastCV[chan-3] = val;
 				//~ }
+				setCV(chan-3, val/1024.0);
 			}
 			
-			printf("%d: %d | %d\n", chan, val, smoothVal);
+			//printf("%d: %d | %d\n", chan, val, smoothVal);
 		}
 		
 		//read button pin
-		int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
-		inputMutex.lock();
-		buttonIn = val;
-		inputMutex.unlock();
-		if(onButton){
-			onButton(buttonIn);
-		}
-		printf("Button%d\n", buttonIn);
+		// int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
+		// inputMutex.lock();
+		//  buttonIn = val;
+		//  inputMutex.unlock();
+		//  if(onButton){
+		// 	 onButton(buttonIn);
+		//  }
+		//~ printf("Button%d\n", buttonIn);
 	}
 	
 	return true;
@@ -185,11 +188,14 @@ bool Input::setupSerial(){
 } 
 
 void Input::setCV(int index, float val){
+	if(index == 1)
+	//std::cout << "Setting CV " << index << ": "<< val<< std::endl; 
+
 	inputMutex.lock();
 	clock_t readtime = clock();
 	cvIn[index] = val;
-	lastCV[index].push_front(val);
-	lastCV[index].pop_back();
+	lastCV[index].push_back(val);
+	lastCV[index].erase(lastCV[index].begin());
 	//save time when the read was performed
 	lastCVRead[index] = (float) readtime / (CLOCKS_PER_SEC);
 	inputMutex.unlock();
@@ -211,10 +217,10 @@ float Input::getPot(int i){
 	return ret;
 }
 
-std::list<float> Input::getCVList(int index){
-	std::list<float> ret;
+std::vector<float> Input::getCVList(int index){
+	std::vector<float> ret;
 	Input::inputMutex.lock();
-	ret = std::list<float>(lastCV[index]);
+	ret = std::vector<float>(lastCV[index]);
 	Input::inputMutex.unlock();
 	return ret;
 }

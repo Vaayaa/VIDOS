@@ -23,7 +23,7 @@
 #include "src/input.h"
 
 #include <time.h>
-#define NUM_SCENES 5
+#define NUM_SCENES 2
 #define IMAGE_SIZE 128
 
 #define IN_TEX_NAME "/images/pusheen.png"
@@ -52,7 +52,7 @@ typedef struct
    GLint inputValY = 0;
    GLint inputValX = 0;
    GLint sceneIndex = 1;
-   GLfloat inputCV0List[CV_LIST_SIZE] = {0}; 
+   std::vector<GLushort> inputCVList; 
    GLfloat inputCV0 = 0.0;
    GLfloat inputCV1 = 0.0;
    GLfloat inputCV2 = 0.;
@@ -61,16 +61,16 @@ typedef struct
    GLuint fshader;
    GLuint mshader;
    GLuint program;
-   GLuint tex_fb = 1; // framebuffer at index 1
-   GLuint tex[3];
-   GLuint cvtex;
+   GLuint framebuffer;
+   GLuint tex[4];
    GLuint buf;
+
    
-   unsigned char* fb_buf;
-   unsigned char* tex_buf;
+   //unsigned char* fb_buf; //feedback disabled
+   unsigned char* inputImageTexBuf;
    int buf_height, buf_width;
 // my shader attribs
-   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texFB, unif_texIN, unif_cvtex, unif_cv0, unif_cv1,unif_cv2, unif_fft; 
+   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1,unif_cv2, unif_fft; 
    GLuint unif_inputVal, unif_sceneIndex;
    
    GLuint unif_time;
@@ -84,6 +84,9 @@ static void checkFramebuffer(){
   GLenum ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   if(ret != GL_FRAMEBUFFER_COMPLETE){
     std::cout<< " Framebuffer issue "<<ret <<   std::endl; 
+    if( ret == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT){
+      std::cout<< "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT" << std::endl;
+    }
   }
 }
 
@@ -110,6 +113,39 @@ static std::string getExecutablePath(){
   int position = path.rfind ('/');
   path = path.substr(0, position) + "/";
   return path;
+}
+
+//UTILITY: Create an unsigned short 16 bit 565 short color from 3 floats
+ 
+static GLushort ushortColor( float red, float green, float blue){
+
+  int r = red * 30;
+  int g = green * 63;
+  int b = blue * 30;
+
+  //std::cout<< "R: "<< r << " G: "<< g << " B: "<< b<< std::endl;
+
+
+  assert (r<31);
+  assert (g<64);
+  assert (b<31);
+  assert (r>-1);
+  assert (g>-1);
+  assert (b>-1);
+
+  GLushort shortColor = 0;
+
+  shortColor = shortColor + r;
+  //std::cout<< "w/R:"<< shortColor<< std::endl;
+  shortColor = shortColor << 6; //move 6 bits ( g is 6 bits )
+  shortColor = shortColor + g;
+  //std::cout<< "w/G:" << shortColor<< std::endl;
+  shortColor = shortColor << 5; //move 5 bits ( r is 5 bits)
+  shortColor = shortColor + b; // b is remaining 6 bits
+  //std::cout<< "w/B:" << shortColor<< std::endl;
+
+  return shortColor;
+
 }
 
 
@@ -222,7 +258,7 @@ static void init_ogl(CUBE_STATE_T *state)
    glClearColor(0.15f, 0.25f, 0.35f, 1.0f);
    glClear( GL_COLOR_BUFFER_BIT );
    //disable depth Buffer
-   glDepthMask(false);
+   //glDepthMask(false);
 
    check();
 }
@@ -245,11 +281,11 @@ std::string readFile(const char *filePath) {
 
 static void load_tex_images(CUBE_STATE_T *state)
 {
-	SOIL_free_image_data(state->tex_buf);
+	SOIL_free_image_data(state->inputImageTexBuf);
 	//SOIL LOADER
-	state->tex_buf = SOIL_load_image(( getExecutablePath() + std::string(IN_TEX_NAME)).c_str(), &state->buf_width, &state->buf_height,0, SOIL_LOAD_RGB);
+	state->inputImageTexBuf = SOIL_load_image(( getExecutablePath() + std::string(IN_TEX_NAME)).c_str(), &state->buf_width, &state->buf_height,0, SOIL_LOAD_RGB);
 	
-	if( 0 == state->tex_buf)
+	if( 0 == state->inputImageTexBuf)
 	{
 		printf( "SOIL loading error: '%s'\n", SOIL_last_result() );
 	}
@@ -265,6 +301,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         1.0,1.0,1.0,1.0,
         -1.0,1.0,1.0,1.0
    };
+   //initialize cv input texture 
+   state->inputCVList = std::vector<GLushort>(CV_LIST_SIZE + sqrt(CV_LIST_SIZE) + 1 ,0);
    
    //TODO: Automatically read files in Shaders/ directory
    //load up the shader files
@@ -318,14 +356,13 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         state->unif_color  = glGetUniformLocation(state->program, "color");
         state->unif_scale  = glGetUniformLocation(state->program, "scale");
         state->unif_offset = glGetUniformLocation(state->program, "offset");
-        state->unif_tex    = glGetUniformLocation(state->program, "tex");
-        state->unif_texFB    = glGetUniformLocation(state->program, "texFB");
+        state->unif_tex    = glGetUniformLocation(state->program, "texFB");
+        state->unif_texCV    = glGetUniformLocation(state->program, "texCV");
         state->unif_texIN    = glGetUniformLocation(state->program, "texIN");         
         state->unif_centre = glGetUniformLocation(state->program, "centre");
         state->unif_time = glGetUniformLocation(state->program, "time");
         state->unif_inputVal = glGetUniformLocation(state->program, "inputVal");
         state->unif_sceneIndex = glGetUniformLocation(state->program, "sceneIndex");
-        state-> unif_cvtex = glGetUniformLocation(state->program, "cvtex");
         state->unif_cv0 = glGetUniformLocation(state->program, "cv0");
          state->unif_cv1 = glGetUniformLocation(state->program, "cv1");
          state->unif_cv2 = glGetUniformLocation(state->program, "cv2");
@@ -347,40 +384,37 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         if(!firstrun){
 			     glDeleteTextures(3,  &state->tex[0]);
 		    }
-        glGenTextures(2, &state->tex[0]);
+        glActiveTexture(GL_TEXTURE0);
+        glGenTextures(3, &state->tex[0]);
         check();
+        //setup drawing texture ( bound to main fb later)
         glBindTexture(GL_TEXTURE_2D,state->tex[0]);
         check();
         
         
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,state->screen_width / CONTEXT_DIV ,state->screen_height/ CONTEXT_DIV ,0,GL_RGB,GL_UNSIGNED_SHORT_5_6_5,0);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,state->screen_width  ,state->screen_height ,0,GL_RGB,GL_UNSIGNED_SHORT_5_6_5,0);
         check();
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         check();
-
-        //init CV texture
-        glGenTextures(1, &state->cvtex);
-        check();
-        glBindTexture(GL_TEXTURE_2D, state->cvtex);
-        //end cv texture init
         
-        // setup input textures
-			SOIL_free_image_data(state->fb_buf);
-			//bind fb tex
+        // setup tex index 1 (used for CV input)
+        glActiveTexture(GL_TEXTURE0 + 1);
 		   glBindTexture(GL_TEXTURE_2D, state->tex[1]);
-
-		   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width , state->screen_height, 0,
-						GL_RGB, GL_UNSIGNED_BYTE, state->fb_buf);
-		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_NEAREST);
-		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
+      
+		   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 2, 0,
+						GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
+       check();
+		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
 		   check();
 		   
 		   //bind input tex	
 		   load_tex_images(state);
+       glActiveTexture(GL_TEXTURE0 + 2);
 		   glBindTexture(GL_TEXTURE_2D, state->tex[2]);
 		   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
-						GL_RGB, GL_UNSIGNED_BYTE, state->tex_buf);
+						GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
 		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_NEAREST);
 		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
 		   check();
@@ -388,18 +422,18 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         
         // Prepare a framebuffer for rendering
         if(!firstrun){
-			glDeleteFramebuffers(1, &state->tex_fb);
+			glDeleteFramebuffers(1, &state->framebuffer);
 		}
 
-        glGenFramebuffers(1, &state->tex_fb);
+        glGenFramebuffers(1, &state->framebuffer);
         check();
-        glBindFramebuffer(GL_FRAMEBUFFER, state->tex_fb);
+        glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
         check();
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,state->tex[0],0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,state->tex[0],0);
         check();
-               checkFramebuffer();
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
-        check();
+        checkFramebuffer();
+        // glBindFramebuffer(GL_FRAMEBUFFER,0);
+        // check();
         // Prepare viewport
         glViewport ( 0, 0, state->screen_width, state->screen_height );
         check();
@@ -420,12 +454,12 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 {
 
 		//render to a texture
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
         //glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb); //ping pong here for framebuffer
         // Clear the background (not really necessary I suppose)
-        //glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         //
-        //checkFramebuffer();
+        checkFramebuffer();
         check();
         
         glBindBuffer(GL_ARRAY_BUFFER, state->buf);
@@ -439,34 +473,50 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         //pass sceneIndex into shader
         glUniform1i( state->unif_sceneIndex, state->sceneIndex);
         //pass CVs into shader
-        state->inputCV0 = abs( inputs.getCV(0) + inputs.getPot(0) );
-        state->inputCV1 = abs( inputs.getCV(1) + inputs.getPot(1) );
-        state->inputCV2 = abs( inputs.getCV(2) + inputs.getPot(2) );
+        state->inputCV0 = abs( inputs.getPot(0) ); //inputs.getCV(0) + 
+        state->inputCV1 = abs(  inputs.getPot(1) ); //inputs.getCV(1) +
+        state->inputCV2 = abs(  inputs.getPot(2) ); // inputs.getCV(2) +
+        
+        //get sqrt of the list size to find out a dimension of the square texture
+        double texDim = sqrt(CV_LIST_SIZE);
         //copy CV list into uniform array
-        std::list<float> cv0list = inputs.getCVList(0);
-        int counter = 0;
-        for (std::list<float>::iterator it = cv0list.begin(); it != cv0list.end(); ++it){
-          //std::cout << *it << " ";
-          if(counter < CV_LIST_SIZE){
-              state->inputCV0List[counter] = *it;
+        std::vector<float> cvlist[3] = {inputs.getCVList(0), inputs.getCVList(1), inputs.getCVList(2)} ;
+        int offset = 0;
+        for(int i = 0; i < CV_LIST_SIZE; ++i){
+          if(i != 0 && (i%(int)texDim) == texDim){ // zero value at start of every line (GL formating for textures is like this, not sure why)
+             state->inputCVList[i] = 0;
+             offset -= 1; 
           }
           else{
-            break;
+            state->inputCVList[i] = ushortColor(cvlist[0][i + offset], cvlist[1][i+ offset], cvlist[2][i + offset]);
           }
-          ++counter;
         }
+        
+        glBindTexture(GL_TEXTURE_2D, state->tex[1]);
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texDim , texDim, 0,
+            GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
+
+        // int size = 9; // size of array is size + sqrt(size) - 1
+        // ushort list[11] = { ushortColor(1.,0., 1.), ushortColor(1.,0., 1.), ushortColor(1.,0., 1.), // magenta
+        //                         0, ushortColor(1.,1.,0.),ushortColor(1.,1., 0.), ushortColor(1.,1., 0.), //yello
+        //                         0 , ushortColor(1.,0, 0.), ushortColor(1.,0, 0.), ushortColor(1.,0, 0.) }; // red
+
+        // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 3, 0,
+        //     GL_RGB, GL_UNSIGNED_SHORT_5_6_5, list);
+
+        check();
+       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+       glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
+       check();
         //std::cout << std::endl;
 
-        glUniform1f(state->unif_cvtex, state->cvtex);
         glUniform1f(state->unif_cv0, state->inputCV0);
         glUniform1f(state->unif_cv1, state->inputCV1);
         glUniform1f(state->unif_cv2, state->inputCV2);
         glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?
-        glUniform1i(state->unif_texFB, 1);
+        glUniform1i(state->unif_texCV, 1);
         glUniform1i(state->unif_texIN, 2);
-        
-        glActiveTexture(GL_TEXTURE0 + 1);
-		glBindTexture(GL_TEXTURE_2D, state->tex[1]); //ping pong texture
         
         //pass time into the frag shader
         clock_t end = clock();
@@ -484,10 +534,6 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glFlush();
         glFinish();
         check();
-        
-        //copy drawn texture for later use
-        
-        state->tex[1] = state->tex_fb ;
         
         // Now render that texture to the main frame buffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

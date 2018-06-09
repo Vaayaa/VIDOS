@@ -1,9 +1,10 @@
 #include <thread>
 #include <mutex>
 #include <functional>
-#include <list>
+#include <vector>
 
-#define CV_LIST_SIZE 5
+#define CV_LIST_SIZE 400
+#define CV_COUNT 3
 
 class Input
 {
@@ -14,7 +15,7 @@ public:
 	void update();
 	void addButtonCallback(std::function<void(bool)> buttonCallback);
 	void setCV (int index, float val);
-	std::list<float> getCVList(int index);
+	std::vector<float> getCVList(int index);
 	float getCV(int i);
 	float getPot(int i);
 
@@ -24,14 +25,14 @@ public:
   
 private:
 	//options
-	bool useSerial = true;
+	bool useSerial = false;
 	
 	int serialFd;
 	float cvIn[3] = {0};
 	float potIn[3] = {1.};
 	int lastPot[3] = {0};
-	std::list<float> lastCV[3] = {std::list<float>(CV_LIST_SIZE, 0.0)};
-	float lastCVRead[3] = {0.,0.,0.};
+	std::vector<float> lastCV[3] = {std::vector<float>(CV_LIST_SIZE, 0.0), std::vector<float>(CV_LIST_SIZE, 0.0), std::vector<float>(CV_LIST_SIZE, 0.0)};
+	float lastCVRead[3] = {0.};
 	int buttonIn = 0;
 	
 	std::function<void(bool)> onButton;
