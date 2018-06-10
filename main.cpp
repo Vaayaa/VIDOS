@@ -23,7 +23,7 @@
 #include "src/input.h"
 
 #include <time.h>
-#define NUM_SCENES 2
+#define NUM_SCENES 1
 #define IMAGE_SIZE 128
 
 #define IN_TEX_NAME "/images/pusheen.png"
@@ -56,6 +56,9 @@ typedef struct
    GLfloat inputCV0 = 0.0;
    GLfloat inputCV1 = 0.0;
    GLfloat inputCV2 = 0.;
+   GLfloat inputCV6 = 0.0;
+   GLfloat inputCV7 = 0.0;
+
    GLfloat inputFFT[4] = {0.0, 0.0, 0.0, 0.0};
    GLuint vshader;
    GLuint fshader;
@@ -70,7 +73,7 @@ typedef struct
    unsigned char* inputImageTexBuf;
    int buf_height, buf_width;
 // my shader attribs
-   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1,unif_cv2, unif_fft; 
+   GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2, unif_cv6, unif_cv7, unif_fft; 
    GLuint unif_inputVal, unif_sceneIndex;
    
    GLuint unif_time;
@@ -78,7 +81,7 @@ typedef struct
 
 static CUBE_STATE_T _state, *state=&_state;
 
-#define check() if(glGetError() != 0) std::cout << "GL ERROR on line: "<< __LINE__ <<std::endl; assert(glGetError() == 0); 
+#define check() ;//if(glGetError() != 0) std::cout << "GL ERROR on line: "<< __LINE__ <<std::endl; assert(glGetError() == 0); 
 
 static void checkFramebuffer(){
   GLenum ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -358,7 +361,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         state->unif_offset = glGetUniformLocation(state->program, "offset");
         state->unif_tex    = glGetUniformLocation(state->program, "texFB");
         state->unif_texCV    = glGetUniformLocation(state->program, "texCV");
-        state->unif_texIN    = glGetUniformLocation(state->program, "texIN");         
+        state->unif_texIN    = glGetUniformLocation(state->program, "texIN");    
+        state->unif_resolution   = glGetUniformLocation(state->program, "resolution");   
         state->unif_centre = glGetUniformLocation(state->program, "centre");
         state->unif_time = glGetUniformLocation(state->program, "time");
         state->unif_inputVal = glGetUniformLocation(state->program, "inputVal");
@@ -366,6 +370,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         state->unif_cv0 = glGetUniformLocation(state->program, "cv0");
          state->unif_cv1 = glGetUniformLocation(state->program, "cv1");
          state->unif_cv2 = glGetUniformLocation(state->program, "cv2");
+         state->unif_cv6 = glGetUniformLocation(state->program, "cv6");
+         state->unif_cv7 = glGetUniformLocation(state->program, "cv7");
          state->unif_fft = glGetUniformLocation(state->program, "fft");
         
         
@@ -415,8 +421,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
 		   glBindTexture(GL_TEXTURE_2D, state->tex[2]);
 		   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
 						GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
-		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_NEAREST);
-		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
+		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+		   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
 		   check();
         
         
@@ -469,18 +475,23 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glUniform4f(state->unif_color, 0.5, 0.5, 0.8, 1.0);
         glUniform2f(state->unif_scale, scale, scale);
         glUniform2f(state->unif_centre, cx, cy);
+        glUniform2f( state->unif_resolution, state->screen_width, state->screen_height);
         glUniform2f(state->unif_inputVal, state->inputValX, state->inputValY);
         //pass sceneIndex into shader
         glUniform1i( state->unif_sceneIndex, state->sceneIndex);
         //pass CVs into shader
-        state->inputCV0 = abs( inputs.getPot(0) ); //inputs.getCV(0) + 
-        state->inputCV1 = abs(  inputs.getPot(1) ); //inputs.getCV(1) +
-        state->inputCV2 = abs(  inputs.getPot(2) ); // inputs.getCV(2) +
+        state->inputCV0 = abs( inputs.getCV(0) ); //inputs.getCV(0) + 
+        state->inputCV1 = abs(  inputs.getCV(1) ); //inputs.getCV(1) +
+        state->inputCV2 = abs(  inputs.getCV(2) ); // inputs.getCV(2) +
+
+        //sliders
+        state->inputCV6 = abs(  inputs.getCV(6) );
+        state->inputCV7 = abs(  inputs.getCV(7) );
         
         //get sqrt of the list size to find out a dimension of the square texture
         double texDim = sqrt(CV_LIST_SIZE);
         //copy CV list into uniform array
-        std::vector<float> cvlist[3] = {inputs.getCVList(0), inputs.getCVList(1), inputs.getCVList(2)} ;
+        std::vector<float> cvlist[3] = {inputs.getCVList(3), inputs.getCVList(4), inputs.getCVList(5)} ;
         int offset = 0;
         for(int i = 0; i < CV_LIST_SIZE; ++i){
           if(i != 0 && (i%(int)texDim) == texDim){ // zero value at start of every line (GL formating for textures is like this, not sure why)
@@ -514,6 +525,8 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glUniform1f(state->unif_cv0, state->inputCV0);
         glUniform1f(state->unif_cv1, state->inputCV1);
         glUniform1f(state->unif_cv2, state->inputCV2);
+        glUniform1f(state->unif_cv6, state->inputCV6);
+        glUniform1f(state->unif_cv7, state->inputCV7);
         glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?
         glUniform1i(state->unif_texCV, 1);
         glUniform1i(state->unif_texIN, 2);

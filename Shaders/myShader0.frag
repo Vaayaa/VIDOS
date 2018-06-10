@@ -2,9 +2,12 @@ uniform vec4 color;
 uniform vec2 scale;
 uniform vec2 centre;
 uniform vec2 inputVal;
+uniform vec2 resolution;
 uniform float cv0;
 uniform float cv1;
 uniform float cv2;
+uniform float cv6;
+uniform float cv7;
 varying vec2 tcoord;
 uniform float time;
 uniform int sceneIndex;
@@ -15,6 +18,9 @@ uniform sampler2D texIN;
 
 #define PI 3.14159265358979323846
 #define TWO_PI 6.28318530718
+
+#define repeat(v) mod(p + 1., 2.) -1.
+#define un(a, b) min(a, b)
 
 float random (float x) {
     return fract(sin(x)*1e4);
@@ -29,6 +35,29 @@ highp float random(vec2 co)
     highp float sn= mod(dt,3.14);
     return fract(sin(sn) * c);
 }
+
+
+// Color Space Conversion \-----------------------------|
+vec3 rgb2hsv(vec3 c)
+{
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsv2rgb(vec3 c)
+{
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+
+//-------------------------------------------------|
 
 vec2 rotate2D(vec2 _st, float _angle){
     _st -= 0.5;
@@ -234,9 +263,70 @@ vec2 toPolar(vec2 st){ // Outputs distance 0 to 1 and Thet
 	return st; 
 }
 
-#define POLAR 0
+mat3 rotateX(float a) {
+	return mat3(
+    	1.0, 0.0, 0.0,
+        0.0, cos(a), sin(a),
+        0.0, -sin(a), cos(a)
+    );
+}
 
-void etch2Main(){
+mat3 rotateY(float a) {
+	return mat3(
+    	cos(a), 0.0, sin(a),
+        0.0, 1.0, 0.0,
+        -sin(a), 0.0, cos(a)
+    );
+}
+
+float sphere_sdf(vec3 p, float r) {
+	return length(p) - r;
+}
+
+float cube_sdf(vec3 p, float s) {
+	return length(max(abs(p) - s, .0));
+}
+
+float ring_sdf(vec3 p) {
+	float a = sphere_sdf(p + vec3(.2, .0, .0), .1);
+    float b = sphere_sdf(p + vec3(-.2, .0, .0), .1);
+    float A = un(a, b);
+    float c = sphere_sdf(p + vec3(.0, .0, .1), .1);
+    float d = sphere_sdf(p + vec3(.0, .0, -.1), .1);
+    float B = un(c, d);
+    return un(A, B);
+}
+
+float shape_sdf(vec3 p) {
+    vec3 v = rotateY(time) * p;
+    v.y = mod(v.y + 0.2, 0.4) - 0.2;
+    return sphere_sdf(v, .1);//ring_sdf(v);//un(, sphere_sdf(p * vec3(1., .01, 1.), .11));
+    
+}
+
+
+//Color Quantizer ( Color Tables? )
+vec3 pallete(float root){
+
+	vec2 triad = vec2(0.33333333, 0.66666666);
+
+
+	vec3 ret = vec3( root, root + triad[0], root +  triad[1] ) ;
+
+	return ret; //return a quantized color scheme
+}
+
+vec3 colorizer( float amplitude,  float color, float saturation ){
+
+	vec3 hsv = rgb2hsv( vec3 (amplitude) );
+	float hue = color;
+
+	float value = amplitude;
+
+	return hsv2rgb( vec3(hue, saturation, value) );
+}
+
+void datBoiFrag(){
 	vec3 texColor = vec3(0.);
 
 	//vec3 center = vec3(cv0 /0.5 ,cv1/0.5, cv2/0.5);
@@ -253,16 +343,32 @@ void etch2Main(){
 	vec2 texPos = mix(rotationPos, polarPos, clamp(cv0*1.1, 0., 1.)  );
 
 	texColor = texture2D( texCV, texPos ).xyz;
-	
-	vec3 fbColor = texture2D( texFB, vec2(pos.x  , pos.y) ).xyz;
 
-	vec3 color = texColor + (fbColor * (cv2/2.)); //+ vec3(cv0, cv1, cv2) ;
-	//color = vec3( cos(polarPos.x  ) );
+
+	//Color Quantization(?) / Pallete Selector
+
+	vec3 hue = pallete(cv6/2.);
+
+
+	//OSC
+	vec3 oscA = colorizer(texColor.x, hue[0], 1. );
+	vec3 oscB = colorizer(texColor.y, hue[1],  1.  );
+	vec3 oscC = colorizer(texColor.z, hue[2],  1. );
 	
+
+	//Feedback
+	float feedbackAmt = (cv2/2.);
+	vec3 fbColor = texture2D( texFB, vec2(pos.x  , pos.y) ).xyz  * feedbackAmt;
+
+
+	//Mixer
+	vec3 color = (oscA * .333 + oscB * .333 + oscC * .333) + fbColor ;// oscB * fbColor; //TODO: add oscC when hardware is done
+	//--------
+
 	gl_FragColor = vec4( color, 1.0 );
 	
 }
 
 void main( void ) {
-	etch2Main();
+	datBoiFrag();
 }

@@ -61,44 +61,28 @@ bool Input::readADC(){
 		{
 			//read in ADC values
 			int val = analogRead( BASE + chan);
-			int smoothVal;
+			// int smoothVal;
+			setCV(chan, val/1024.0);
 			
-			//channels 0,1,2 are Potentiometers
-			if(chan < 3){
-				smoothVal = smooth(val, lastPot[chan]);
-				//~ if(smoothVal != -1){
-					inputMutex.lock();
-					
-					potIn[chan] = val/1024.0;
-					inputMutex.unlock();
-					lastPot[chan] = val;
-				//~ }
-			}
-			
-			//channels 3,4,5 are corresponding CVs
-			else if(chan < 6){
-				//~ smoothVal = smooth(val, lastCV[chan-3]);
-				//~ if(smoothVal != -1){
-					 //~ inputMutex.lock();
-					//~ cvIn[chan-3] = val/1024.0;
-					//~ inputMutex.unlock();
-					//lastCV[chan-3] = val;
-				//~ }
-				setCV(chan-3, val/1024.0);
-			}
-			
-			//printf("%d: %d | %d\n", chan, val, smoothVal);
+			// if( chan == 6)
+			// 	printf("%d: %d \n", chan, val);
 		}
 		
 		//read button pin
-		// int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
-		// inputMutex.lock();
-		//  buttonIn = val;
-		//  inputMutex.unlock();
-		//  if(onButton){
-		// 	 onButton(buttonIn);
-		//  }
-		//~ printf("Button%d\n", buttonIn);
+		int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
+		bool pressedDown = false;
+		inputMutex.lock();
+		if(val != buttonIn){
+			if(!buttonIn){
+				pressedDown = true;
+			}
+			buttonIn = val;
+		}
+		inputMutex.unlock();
+		if(onButton && pressedDown){
+			onButton(buttonIn);
+		}
+		//printf("Button%d\n", buttonIn);
 	}
 	
 	return true;
@@ -142,15 +126,11 @@ bool Input::readSerial(){
 						
 						if(index < 10){//cv input
 							//inputMutex.lock();
-							setCV(index, val/1024.0);
+							//setCV(index, val/1024.0);
 							//cvIn[index] = val/1024.0;
 							//inputMutex.unlock();
 						}
-						else if (index >= 10 && index < 20){ //knob input
-							inputMutex.lock();
-							potIn[index-10] = val / 1024.0; //( val -512.0)/1024.0 * 2.; //scaled to -1 to 1
-							inputMutex.unlock();
-						}
+
 						else if( index >= 30 && index < 40){ //button Input
 							inputMutex.lock();
 							
@@ -188,8 +168,16 @@ bool Input::setupSerial(){
 } 
 
 void Input::setCV(int index, float val){
-	if(index == 1)
+	// if(index == 1)
 	//std::cout << "Setting CV " << index << ": "<< val<< std::endl; 
+
+	//~ smoothVal = smooth(val, lastCV[chan-3]);
+	//~ if(smoothVal != -1){
+		 //~ inputMutex.lock();
+		//~ cvIn[chan-3] = val/1024.0;
+		//~ inputMutex.unlock();
+		//lastCV[chan-3] = val;
+	//~ }
 
 	inputMutex.lock();
 	clock_t readtime = clock();
@@ -205,14 +193,6 @@ float Input::getCV(int i){
 	float ret;
 	Input::inputMutex.lock();
 	ret = cvIn[i];
-	Input::inputMutex.unlock();
-	return ret;
-}
-
-float Input::getPot(int i){
-	float ret;
-	Input::inputMutex.lock();
-	ret = potIn[i];
 	Input::inputMutex.unlock();
 	return ret;
 }
