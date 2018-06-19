@@ -479,6 +479,9 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glUniform2f(state->unif_inputVal, state->inputValX, state->inputValY);
         //pass sceneIndex into shader
         glUniform1i( state->unif_sceneIndex, state->sceneIndex);
+
+        //UPDATE UNIFORM VALUES
+
         //pass CVs into shader
         state->inputCV0 = abs( inputs.getCV(0) ); //inputs.getCV(0) + 
         state->inputCV1 = abs(  inputs.getCV(1) ); //inputs.getCV(1) +
@@ -508,19 +511,10 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texDim , texDim, 0,
             GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
 
-        // int size = 9; // size of array is size + sqrt(size) - 1
-        // ushort list[11] = { ushortColor(1.,0., 1.), ushortColor(1.,0., 1.), ushortColor(1.,0., 1.), // magenta
-        //                         0, ushortColor(1.,1.,0.),ushortColor(1.,1., 0.), ushortColor(1.,1., 0.), //yello
-        //                         0 , ushortColor(1.,0, 0.), ushortColor(1.,0, 0.), ushortColor(1.,0, 0.) }; // red
-
-        // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 3, 0,
-        //     GL_RGB, GL_UNSIGNED_SHORT_5_6_5, list);
-
         check();
        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
        check();
-        //std::cout << std::endl;
 
         glUniform1f(state->unif_cv0, state->inputCV0);
         glUniform1f(state->unif_cv1, state->inputCV1);
