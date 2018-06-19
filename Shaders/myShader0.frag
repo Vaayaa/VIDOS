@@ -310,20 +310,15 @@ vec3 pallete(float root){
 
 	vec2 triad = vec2(0.33333333, 0.66666666);
 
-
 	vec3 ret = vec3( root, root + triad[0], root +  triad[1] ) ;
 
 	return ret; //return a quantized color scheme
 }
 
 vec3 colorizer( float amplitude,  float color, float saturation ){
+	float value = (amplitude - 0.5) * 2.; //take out this math( input voltages should be unipolar )
 
-	vec3 hsv = rgb2hsv( vec3 (amplitude) );
-	float hue = color;
-
-	float value = amplitude;
-
-	return hsv2rgb( vec3(hue, saturation, value) );
+	return hsv2rgb( vec3(color, saturation, value) );
 }
 
 void datBoiFrag(){
@@ -334,7 +329,7 @@ void datBoiFrag(){
 	vec2 swappedPos = vec2( tcoord.y, tcoord.x);
 
 	//Rotation control for UV in (TODO: rotation per osc)
-	vec2 rotationPos = rotate2D(pos, clamp(cv1*1.2-0.1, 0., 1.) * -TWO_PI);
+	vec2 rotationPos = rotate2D(pos, clamp(cv7*1.2-0.1, 0., 1.) * -TWO_PI);
 
 	vec2 polarPos = toPolar(rotationPos) ;
 	vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
@@ -345,24 +340,23 @@ void datBoiFrag(){
 	texColor = texture2D( texCV, texPos ).xyz;
 
 
-	//Color Quantization(?) / Pallete Selector
+	//Color Quantization(?) / Palette Selector
 
-	vec3 hue = pallete(cv6/2.);
+	vec3 hue = pallete(cv6 * .6666);
 
 
 	//OSC
-	vec3 oscA = colorizer(texColor.x, hue[0], 1. );
-	vec3 oscB = colorizer(texColor.y, hue[1],  1.  );
-	vec3 oscC = colorizer(texColor.z, hue[2],  1. );
+	vec3 oscA = colorizer(texColor.x, hue[0], cv1 );
+	vec3 oscB = colorizer(texColor.y, hue[1],  cv1  );
+	vec3 oscC = colorizer(texColor.z, hue[2],  cv1 );
 	
 
 	//Feedback
-	float feedbackAmt = (cv2/2.);
-	vec3 fbColor = texture2D( texFB, vec2(pos.x  , pos.y) ).xyz  * feedbackAmt;
+	vec3 fbColor = texture2D( texFB, pos ).xyz  * cv2 * 2.;
 
 
 	//Mixer
-	vec3 color = (oscA * .333 + oscB * .333 + oscC * .333) + fbColor ;// oscB * fbColor; //TODO: add oscC when hardware is done
+	vec3 color = (oscA  +  oscB  + oscC )  + fbColor; //TODO: add oscC when hardware is done
 	//--------
 
 	gl_FragColor = vec4( color, 1.0 );

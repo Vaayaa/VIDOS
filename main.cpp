@@ -398,7 +398,7 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
         check();
         
         
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,state->screen_width  ,state->screen_height ,0,GL_RGB,GL_UNSIGNED_SHORT_5_6_5,0);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,state->screen_width/CONTEXT_DIV  ,state->screen_height/CONTEXT_DIV ,0,GL_RGB,GL_UNSIGNED_SHORT_5_6_5,0);
         check();
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -728,6 +728,7 @@ int main ()
    inputs.addButtonCallback(&onButton);
    while (!terminate)
    {
+    clock_t frameBegin = clock();
 
 	  if(!readKeyboard()){
 		destroyShader();
@@ -742,6 +743,10 @@ int main ()
 	  else{
 		  draw_triangles(state, cx, cy, 0.003);
 	  }
+
+    clock_t frameEnd = clock();
+    double elapsed_secs = double(frameEnd - frameBegin) / CLOCKS_PER_SEC;
+    std::cout<< "Frame Time: " << elapsed_secs << std::endl;
 
    }
    
