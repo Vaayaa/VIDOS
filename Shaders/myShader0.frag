@@ -356,13 +356,16 @@ void datBoiFrag(){
 
 
 	//Mixer
-	vec3 color = (oscA  +  oscB  + oscC )  + fbColor; //TODO: add oscC when hardware is done
+	vec3 color = (oscA  +  oscB  + oscC ) + fbColor; //TODO: add oscC when hardware is done
 	//--------
 
 	gl_FragColor = vec4( color, 1.0 );
+
+	gl_FragColor = vec4( vec3(0.5), 1.0);
 	
 }
 
 void main( void ) {
 	datBoiFrag();
+
 }

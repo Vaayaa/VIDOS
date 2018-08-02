@@ -1,3 +1,6 @@
+#ifndef INPUT_CPP
+#define INPUT_CPP
+
 #include "input.h"
 #include <iostream>
 #include <unistd.h>
@@ -13,38 +16,38 @@
 #include "mcp3004.h"
 
 
-Input::Input(){
+Input::Input() {
 	onButton = 0;
-	if(useSerial){
-		std::cout<< "Using Serial (Arduino) for Input." <<std::endl;
+	if (useSerial) {
+		std::cout << "Using Serial (Arduino) for Input." << std::endl;
 		setupSerial();
 	}
-	else{
-		std::cout<< "Using MCP3008 for Input." <<std::endl;
+	else {
+		std::cout << "Using MCP3008 for Input." << std::endl;
 		setupADC();
 	}
 }
 
-Input::~Input(){
-	if(threadRunning){
+Input::~Input() {
+	if (threadRunning) {
 		threadRunning = false;
 		inputThread.join();
 	}
 }
 
-void Input::update(){
-	
+void Input::update() {
+
 }
 
-void Input::addButtonCallback(std::function<void(bool)> buttonCallback){
+void Input::addButtonCallback(std::function<void(bool)> buttonCallback) {
 	onButton = buttonCallback;
 }
 
-bool Input::setupADC(){
+bool Input::setupADC() {
 	//initialize wiringPi
 	if (wiringPiSetup() == -1)
 	{
-		std::cout<< "Input Error: WiringPi setup failure" << std::endl;
+		std::cout << "Input Error: WiringPi setup failure" << std::endl;
 		return false;
 	}
 	mcp3004Setup(BASE, SPI_CHAN);
@@ -54,37 +57,37 @@ bool Input::setupADC(){
 	return true;
 }
 
-bool Input::readADC(){
-	while(threadRunning){
+bool Input::readADC() {
+	while (threadRunning) {
 		//read mcp3008
-		for ( int chan = 0; chan < 8 ;chan++) 
+		for ( int chan = 0; chan < 8 ; chan++)
 		{
 			//read in ADC values
 			int val = analogRead( BASE + chan);
 			// int smoothVal;
-			setCV(chan, val/1024.0);
-			
+			setCV(chan, val / 1024.0);
+
 			// if( chan == 6)
 			// 	printf("%d: %d \n", chan, val);
 		}
-		
+
 		//read button pin
 		int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
 		bool pressedDown = false;
 		inputMutex.lock();
-		if(val != buttonIn){
-			if(!buttonIn){
+		if (val != buttonIn) {
+			if (!buttonIn) {
 				pressedDown = true;
 			}
 			buttonIn = val;
 		}
 		inputMutex.unlock();
-		if(onButton && pressedDown){
+		if (onButton && pressedDown) {
 			onButton(buttonIn);
 		}
 		//printf("Button%d\n", buttonIn);
 	}
-	
+
 	return true;
 }
 
@@ -93,90 +96,87 @@ bool Input::readADC(){
 //Serial input - from arduino
 
 //reads serial inputs from Arduino, make sure to setupSerial() before calling this function
-bool Input::readSerial(){
-	
-	while(threadRunning){
+bool Input::readSerial() {
+
+	while (threadRunning) {
 		char buff[0x1000];
 		ssize_t rd = read(serialFd, buff, 100);
-		if(rd != 0){
-			if(strchr(buff, '\n') != NULL){
+		if (rd != 0) {
+			if (strchr(buff, '\n') != NULL) {
 				char* tok;
-				
+
 				int index = -1;
 				tok = strtok(buff, " ");
-				if (tok != NULL){
-					
+				if (tok != NULL) {
+
 					index = atoi(tok);
 					//~ std::cout<< "Index: "<< index <<std::endl;
 				}
-				else{
+				else {
 					//~ return false;
 				}
-					tok = strtok(NULL, "\n");
-					
-					if (tok != NULL){
-						//~ printf("Value: %s\n", tok);
-						int val = atoi(tok);
-						if(val < 0){
-							val = 0;
-						}
-						else if(val > 1024){
-							val = 1024;
-						}
-						
-						if(index < 10){//cv input
-							//inputMutex.lock();
-							//setCV(index, val/1024.0);
-							//cvIn[index] = val/1024.0;
-							//inputMutex.unlock();
-						}
+				tok = strtok(NULL, "\n");
 
-						else if( index >= 30 && index < 40){ //button Input
-							inputMutex.lock();
-							
-							buttonIn = val;
-							inputMutex.unlock();
-							
-							onButton(buttonIn);
-							
-						}
-							
+				if (tok != NULL) {
+					//~ printf("Value: %s\n", tok);
+					int val = atoi(tok);
+					if (val < 0) {
+						val = 0;
 					}
+					else if (val > 1024) {
+						val = 1024;
+					}
+
+					if (index < 10) { //cv input
+						setCV(index, val/1024.0);
+					}
+
+					else if ( index >= 30 && index < 40) { //button Input
+						inputMutex.lock();
+
+						buttonIn = val;
+						inputMutex.unlock();
+
+						onButton(buttonIn);
+
+					}
+
 				}
-
-					
 			}
-	}
-			
-	return true;		
-} 
 
-bool Input::setupSerial(){
+
+		}
+	}
+
+	return true;
+}
+
+bool Input::setupSerial() {
 	const char *dev = "/dev/ttyUSB0";
 
-    serialFd = open(dev, O_RDWR| O_NOCTTY | O_NDELAY |O_NONBLOCK);
-    fcntl(serialFd, F_SETFL, 0);
-    if (serialFd == -1) {
-        fprintf(stderr, "Cannot open %s: %s.\n", dev, strerror(errno));
-        return false;
-    }
-    
-    threadRunning = true;
-    inputThread = std::thread(&Input::readSerial, this);
-    
-    return true;
-} 
+	serialFd = open(dev, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK);
+	fcntl(serialFd, F_SETFL, 0);
+	if (serialFd == -1) {
+		fprintf(stderr, "Cannot open %s: %s.\n", dev, strerror(errno));
+		return false;
+	}
 
-void Input::setCV(int index, float val){
+	threadRunning = true;
+	inputThread = std::thread(&Input::readSerial, this);
+
+	return true;
+}
+
+void Input::setCV(int index, float val) {
 	// if(index == 1)
-	//std::cout << "Setting CV " << index << ": "<< val<< std::endl; 
+	//std::cout << "Setting CV " << index << ": "<< val<< std::endl;
 
 	//~ smoothVal = smooth(val, lastCV[chan-3]);
 	//~ if(smoothVal != -1){
-		 //~ inputMutex.lock();
-		//~ cvIn[chan-3] = val/1024.0;
-		//~ inputMutex.unlock();
-		//lastCV[chan-3] = val;
+	//~ inputMutex.lock();
+	//~ cvIn[chan-3] = val/1024.0;
+	//~ inputMutex.unlock();
+	//lastCV[chan-3] = val;
 	//~ }
 
 	inputMutex.lock();
@@ -189,7 +189,7 @@ void Input::setCV(int index, float val){
 	inputMutex.unlock();
 }
 
-float Input::getCV(int i){
+float Input::getCV(int i) {
 	float ret;
 	Input::inputMutex.lock();
 	ret = cvIn[i];
@@ -197,7 +197,7 @@ float Input::getCV(int i){
 	return ret;
 }
 
-std::vector<float> Input::getCVList(int index){
+std::vector<float> Input::getCVList(int index) {
 	std::vector<float> ret;
 	Input::inputMutex.lock();
 	ret = std::vector<float>(lastCV[index]);
@@ -205,21 +205,23 @@ std::vector<float> Input::getCVList(int index){
 	return ret;
 }
 
-int Input::smooth(int in, int PrevVal){ 
-    int margin = PrevVal * .008; //  get 2% of the raw value.  Tune for lowest non-jitter value.
-    /*
-     * Next we add (or subtract...) the 'standard' fixed value to the previous reading. (PotPrevVal needs to be declared outside the function so it persists.)
-     * Here's the twist: Since the jitter seems to be worse at high raw vals, we also add/subtract the 2% of total raw. Insignificantat on low 
-     * raw vals, but enough to remove the jitter at raw >900 without wrecking linearity or adding 'lag', or slowing down the loop, etc.
-     */
-    if (in > PrevVal + (4 + margin) || in < PrevVal - (5 + margin)) { // a 'real' change in value? Tune the two numeric values for best results
-      
-      //average last 2 values ofr smoothing
-      in = (PrevVal + in) / 2.0;
-      //PotPrevVal = in; // store valid raw val  for next comparison
-      return in;
-    }  
-    return -1;  
+int Input::smooth(int in, int PrevVal) {
+	int margin = PrevVal * .008; //  get 2% of the raw value.  Tune for lowest non-jitter value.
+	/*
+	 * Next we add (or subtract...) the 'standard' fixed value to the previous reading. (PotPrevVal needs to be declared outside the function so it persists.)
+	 * Here's the twist: Since the jitter seems to be worse at high raw vals, we also add/subtract the 2% of total raw. Insignificantat on low
+	 * raw vals, but enough to remove the jitter at raw >900 without wrecking linearity or adding 'lag', or slowing down the loop, etc.
+	 */
+	if (in > PrevVal + (4 + margin) || in < PrevVal - (5 + margin)) { // a 'real' change in value? Tune the two numeric values for best results
+
+		//average last 2 values ofr smoothing
+		in = (PrevVal + in) / 2.0;
+		//PotPrevVal = in; // store valid raw val  for next comparison
+		return in;
+	}
+	return -1;
 }
- 
+
 //==============================================================================
+
+#endif

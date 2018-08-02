@@ -11,10 +11,10 @@ CPPFLAGS+= -std=c++0x -DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACRO
 LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/  -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont
 
 INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads -I$(SDKSTAGE)/opt/vc/include/interface/vmcs_host/linux -I./ -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont
-INCLUDES+= -Isrc
+INCLUDES+= -Isrc 
 
 
-LDLIBS+= -lSOIL -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -lm -lwiringPi -lm -lasound 
+LDLIBS+= -lSOIL -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -lm -lwiringPi -lm -lasound $(wildcard lib/*.a)
 
 .PHONY: all clean
 
