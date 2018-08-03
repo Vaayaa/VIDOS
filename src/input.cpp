@@ -83,7 +83,7 @@ bool Input::readADC() {
 		}
 		inputMutex.unlock();
 		if (onButton && pressedDown) {
-			onButton(buttonIn);
+			//onButton(buttonIn);
 		}
 		//printf("Button%d\n", buttonIn);
 	}
@@ -110,7 +110,7 @@ bool Input::readSerial() {
 				if (tok != NULL) {
 
 					index = atoi(tok);
-					//~ std::cout<< "Index: "<< index <<std::endl;
+					//std::cout<< "Index: "<< index <<std::endl;
 				}
 				else {
 					//~ return false;
@@ -118,7 +118,9 @@ bool Input::readSerial() {
 				tok = strtok(NULL, "\n");
 
 				if (tok != NULL) {
-					//~ printf("Value: %s\n", tok);
+					if(index == 10){
+					 //printf("Value: %s\n", tok);
+					}
 					int val = atoi(tok);
 					if (val < 0) {
 						val = 0;
@@ -127,8 +129,9 @@ bool Input::readSerial() {
 						val = 1024;
 					}
 
-					if (index < 10) { //cv input
-						setCV(index, val/1024.0);
+					if (index >= 10) { //cv input
+
+						setCV(index - 10, val/1024.0);
 					}
 
 					else if ( index >= 30 && index < 40) { //button Input
@@ -168,8 +171,8 @@ bool Input::setupSerial() {
 }
 
 void Input::setCV(int index, float val) {
-	// if(index == 1)
-	//std::cout << "Setting CV " << index << ": "<< val<< std::endl;
+	// if(index == 2)
+	// std::cout << "Setting CV " << index << ": "<< val<< std::endl;
 
 	//~ smoothVal = smooth(val, lastCV[chan-3]);
 	//~ if(smoothVal != -1){

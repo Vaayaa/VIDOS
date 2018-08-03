@@ -360,12 +360,12 @@ void datBoiFrag(){
 	//--------
 
 	gl_FragColor = vec4( color, 1.0 );
-
-	gl_FragColor = vec4( vec3(0.5), 1.0);
 	
 }
 
 void main( void ) {
-	datBoiFrag();
+	//datBoiFrag();
+	vec3 texColor = texture2D( texCV, tcoord.xy ).xyz;
+	gl_FragColor = vec4( vec3(texColor.x), 1.0);
 
 }

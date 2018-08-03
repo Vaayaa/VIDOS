@@ -1,11 +1,14 @@
 #ifndef AUDIO_CPP
 #define AUDIO_CPP
 
+
 #include <stdio.h>
 #include <math.h>
-#include <audio.h>
 #include <iostream>
 #include <cstring>
+
+#include "audio.h"
+#include "input.h"
 
 
 class ScopedPaHandler
@@ -30,21 +33,33 @@ private:
 };
 
 Audio::Audio(): stream(0), left_phase(0), right_phase(0) {
-	/* initialise sinusoidal wavetable */ //replace this with something more interesting
-	for ( int i = 0; i < TABLE_SIZE; i++ )
-	{
-		sine[i] = (float) sin( ((double)i / (double)TABLE_SIZE) * M_PI * 2. );
-	}
 
+	createWaveTable();
 	//start the audio thread (basically just sleeps while audio runs in the background, not sure how to do this correctly)
 	thread = std::thread(&Audio::run, this );
 	
+}
+
+Audio::Audio(Input* in){
+	inputs = in;
+	createWaveTable();
+
+	//start the audio thread (basically just sleeps while audio runs in the background, not sure how to do this correctly)
+	thread = std::thread(&Audio::run, this );
 }
 
 Audio::~Audio() {
 	stop();
 	close();
 	thread.join();
+}
+
+void Audio::createWaveTable(){
+	/* initialise sinusoidal wavetable */ //replace this with something more interesting
+	for ( int i = 0; i < TABLE_SIZE; i++ )
+	{
+		sine[i] = tanh( (float) sin(  log((double)i / (double)TABLE_SIZE )   * M_PI * 2. * inputs->getCV(1)) * sin( ( (double)i / (double)TABLE_SIZE ) * ( log(inputs->getCV(2) * 10.)  * M_PI * 2. * inputs->getCV(1) ) )   );
+	}
 }
 
 
@@ -59,7 +74,7 @@ bool Audio::run(){
 
 	if (open(Pa_GetDefaultOutputDevice()))
 	{
-		printf("Playing a sin wave" );
+		printf("Playing a sin wave\n" );
 
 			if (start()) {
 				
@@ -99,7 +114,7 @@ bool Audio::open(PaDeviceIndex index)
 	                  SAMPLE_RATE,
 	                  //paFramesPerBufferUnspecified,
 	                  FRAMES_PER_BUFFER,
-	                  paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+	                  0,      /* we won't output out of range samples so don't bother clipping them */
 	                  &Audio::paCallback,
 	                  this            /* Using 'this' for userData so we can cast to Audio* in paCallback method */
 	              );
@@ -169,18 +184,32 @@ int Audio::paCallbackMethod(const void *inputBuffer, void *outputBuffer,
 	(void) statusFlags;
 	(void) inputBuffer;
 
+	createWaveTable();
+
 	for ( i = 0; i < framesPerBuffer; i++ )
 	{
-		left_phase += 3;
+		//std::cout<< inputs->getCV(0) <<std::endl;
+		float playSpeed = 5 * inputs->getCV(0);
+		left_phase += playSpeed;
 		if ( left_phase >= TABLE_SIZE ) left_phase -= TABLE_SIZE;
-		right_phase += 1; /* higher pitch so we can distinguish left and right. */
+		right_phase += playSpeed; /* higher pitch so we can distinguish left and right. */
 		if ( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
 
-		*out++ = sine[left_phase];  /* left */
-		*out++ = sine[right_phase];  /* right */
+
+		*out++ = sine[(int)floor(left_phase)];  /* left */
+		//buffer[0][i]= *out;
+		float left = *out;
+		*out++ = sine[(int)floor(right_phase)];  /* right */
+		float right = *out;
+		recordMutex.lock();
+		buffer[0].push_back(left);
+		buffer[0].pop_front();
+		buffer[1].push_back(right);
+		buffer[1].pop_front();
+		recordMutex.unlock();
 	}
 	
-	memcpy(bufferCopy, out, framesPerBuffer * 2.);
+	//memcpy(bufferCopy, out, framesPerBuffer * 2.);
 
 
 	return paContinue;
@@ -192,8 +221,11 @@ void Audio::paStreamFinishedMethod()
 	printf( "Stream Completed: %s\n", message );
 }
 
-float* Audio::getBuffer(){
-	return bufferCopy;
+std::list<float> Audio::getBuffer(int index){
+	recordMutex.lock();
+	std::list<float> out = std::list<float>(buffer[index]);
+	recordMutex.unlock();
+	return out;
 }
 
 int Audio::getFramesPerBuffer(){

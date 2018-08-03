@@ -3,19 +3,26 @@
 
 #include "lib/portaudio.h"
 #include <thread>
+#include <mutex>
+#include <list>
 
-#define SAMPLE_RATE   (44100)
+#define SAMPLE_RATE   (88200)
 #define FRAMES_PER_BUFFER   (1024)
-#define TABLE_SIZE   (200)
+#define TABLE_SIZE   (800)
 
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 
+#define RECORD_BUFFER  (4096)
+
+class Input;
+
 class Audio
 {
 public:
 	Audio();
+	Audio(Input* in);
 	~Audio();
 
 	bool open(PaDeviceIndex index);
@@ -26,9 +33,10 @@ public:
 	bool run();
 
 	int getFramesPerBuffer();
-	float* getBuffer();
+	std::list<float> getBuffer(int index);
 
 private:
+	void createWaveTable();
 
 	int paCallbackMethod(const void *inputBuffer, void *outputBuffer,
 	                     unsigned long framesPerBuffer,
@@ -62,14 +70,17 @@ private:
 		return ((Audio*)userData)->paStreamFinishedMethod();
 	}
 
+	Input* inputs;
+
 	PaStream *stream;
 	float sine[TABLE_SIZE];
-	float buffer[FRAMES_PER_BUFFER][2] = {0};
+	std::list<float> buffer[2] = {std::list<float>(RECORD_BUFFER, 0.0), std::list<float>(RECORD_BUFFER, 0.0)};
 	
-	int left_phase;
-	int right_phase;
+	float left_phase;
+	float right_phase;
 	char message[20];
 	std::thread thread;
+	std::mutex recordMutex;
 
 	float bufferCopy[FRAMES_PER_BUFFER + FRAMES_PER_BUFFER] = {0};
 

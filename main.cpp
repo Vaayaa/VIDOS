@@ -36,8 +36,8 @@ clock_t begin = clock();
 
 bool programRunning = true;
 
-Input inputs;
-Audio audio;
+Input* inputs;
+Audio* audio;
 
 bool loadNewScene = false;
 float lastButtonState = 0;
@@ -278,7 +278,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
     -1.0, 1.0, 1.0, 1.0
   };
   //initialize cv input texture
-  state->inputCVList = std::vector<GLushort>(CV_LIST_SIZE + sqrt(CV_LIST_SIZE) + 1 , 0);
+  //state->inputCVList = std::vector<GLushort>(CV_LIST_SIZE + sqrt(CV_LIST_SIZE) + 1 , 0);
+  state->inputCVList = std::vector<GLushort>(RECORD_BUFFER + sqrt(RECORD_BUFFER) + 1 , 0);
 
   //TODO: Automatically read files in Shaders/ directory
   //load up the shader files
@@ -368,8 +369,8 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
   glBindTexture(GL_TEXTURE_2D, state->tex[0]);
   check();
 
-
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width / CONTEXT_DIV  , state->screen_height / CONTEXT_DIV , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  //usually has "/ CONTEXT_DIV " this isnt working in some cases for some reason
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width   , state->screen_height  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
   check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -404,10 +405,13 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
 
   glGenFramebuffers(1, &state->framebuffer);
   check();
+
   glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
   check();
+
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, state->tex[0], 0);
   check();
+  
   checkFramebuffer();
   // glBindFramebuffer(GL_FRAMEBUFFER,0);
   // check();
@@ -422,6 +426,7 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
   glVertexAttribPointer(state->attr_vertex, 4, GL_FLOAT, 0, 16, 0);
   glEnableVertexAttribArray(state->attr_vertex);
   check();
+
 }
 
 
@@ -429,7 +434,6 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
 
 static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat scale)
 {
-
   //render to a texture
   glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
   //glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb); //ping pong here for framebuffer
@@ -438,7 +442,6 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   //
   checkFramebuffer();
   check();
-  std::cout << " Cleared " << std::endl;
 
   glBindBuffer(GL_ARRAY_BUFFER, state->buf);
   check();
@@ -455,34 +458,61 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   //UPDATE UNIFORM VALUES
 
   //pass CVs into shader
-  state->inputCV0 = abs( inputs.getCV(0) ); //inputs.getCV(0) +
-  state->inputCV1 = abs(  inputs.getCV(1) ); //inputs.getCV(1) +
-  state->inputCV2 = abs(  inputs.getCV(2) ); // inputs.getCV(2) +
+  state->inputCV0 = abs( inputs->getCV(0) ); //inputs->getCV(0) +
+  state->inputCV1 = abs(  inputs->getCV(1) ); //inputs->getCV(1) +
+  state->inputCV2 = abs(  inputs->getCV(2) ); // inputs->getCV(2) +
 
   //sliders
-  state->inputCV6 = abs(  inputs.getCV(6) );
-  state->inputCV7 = abs(  inputs.getCV(7) );
+  state->inputCV6 = abs(  inputs->getCV(6) );
+  state->inputCV7 = abs(  inputs->getCV(7) );
 
-  //get audio buffer and feed that into an input
-  float* buffer = {audio.getBuffer()};
-  
-
+  //OLD VER ( CV LIST ONLY )
   //get sqrt of the list size to find out a dimension of the square texture
-  double texDim = sqrt(CV_LIST_SIZE);
+  // double texDim = sqrt(CV_LIST_SIZE);
   //copy CV list into uniform array
-  std::vector<float> cvlist[3] = {inputs.getCVList(3), inputs.getCVList(4), inputs.getCVList(5)} ;
+  // std::vector<float> cvlist[3] = {inputs->getCVList(3), inputs->getCVList(4), inputs->getCVList(5)} ;
+  // int offset = 0;
+  // for (int i = 0; i < CV_LIST_SIZE; ++i) {
+  //   if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
+  //     state->inputCVList[i] = 0;
+  //     offset -= 1;
+  //   }
+  //   else {
+  //     state->inputCVList[i] = ushortColor( cvlist[1][i + offset], cvlist[1][i + offset], cvlist[2][i + offset]);
+  //   }
+  // }
+
+  //INTERNAL OSCS VER
+  //get audio buffer and feed that into an input
+  std::list<float> bufferL = audio->getBuffer(0);
+  std::list<float> bufferR = audio->getBuffer(1);
+  double texDim = sqrt(bufferL.size());
+
+  std::list<float>::iterator itL = bufferL.begin();
+  std::list<float>::iterator itR = bufferR.begin();
+
   int offset = 0;
-  for (int i = 0; i < CV_LIST_SIZE; ++i) {
+  for (int i = 0; i < bufferL.size(); ++i) {
     if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
       state->inputCVList[i] = 0;
       offset -= 1;
     }
     else {
-      //std::cout<< (buffer[i+offset] + 1./2.) <<std::endl;
-      state->inputCVList[i] = ushortColor( cvlist[1][i + offset]  , cvlist[1][i + offset], cvlist[2][i + offset]);
+      
+      float audioValL = ((*itL + 1.) / 2.);
+      float audioValR = ((*itR + 1.) / 2.);
+      //std::cout<< audioVal << std::endl; 
+      if(audioValL < 0 || audioValL > 1.){
+        std::cout<< "         WHOA:" << audioValL <<std::endl;
+      }
+      else{
+        state->inputCVList[i] = ushortColor( audioValL , audioValR , 0);
+      }
+      ++itL;
+      ++itR;
     }
   }
-
+  //std::cout<< "reading buffer" <<std::endl;
 
   glBindTexture(GL_TEXTURE_2D, state->tex[1]);
 
@@ -690,6 +720,14 @@ int main ()
   // Clear application state
   memset( state, 0, sizeof( *state ) );
 
+  //Start Inputs
+  inputs = new Input();
+
+  //Start Audio Engine
+  audio = new Audio(inputs);
+
+  std::cout << "Audio Started" << std::endl;
+
   // Start OGLES
   init_ogl(state);
   init_shaders(state);
@@ -697,7 +735,7 @@ int main ()
   cy = state->screen_height / 2;
 
   setupKeyboard();
-  inputs.addButtonCallback(&onButton);
+  inputs->addButtonCallback(&onButton);
   while (!terminate)
   {
     clock_t frameBegin = clock();
@@ -728,6 +766,9 @@ int main ()
 
   fflush(stdout);
   fprintf(stderr, "%s.\n", strerror(errno));
+
+  delete(inputs);
+  delete(audio);
 
 
   return 0;
