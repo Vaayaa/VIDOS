@@ -6,6 +6,7 @@
 #include <math.h>
 #include <iostream>
 #include <cstring>
+#include <time.h>  
 
 #include "audio.h"
 #include "input.h"
@@ -32,7 +33,7 @@ private:
 	PaError _result;
 };
 
-Audio::Audio(): stream(0), left_phase(0), right_phase(0) {
+Audio::Audio(): stream(0), left_phase(0), right_phase(0){
 
 	createWaveTable();
 	//start the audio thread (basically just sleeps while audio runs in the background, not sure how to do this correctly)
@@ -58,7 +59,7 @@ void Audio::createWaveTable(){
 	/* initialise sinusoidal wavetable */ //replace this with something more interesting
 	for ( int i = 0; i < TABLE_SIZE; i++ )
 	{
-		sine[i] = tanh( (float) sin(  log((double)i / (double)TABLE_SIZE )   * M_PI * 2. * inputs->getCV(1)) * sin( ( (double)i / (double)TABLE_SIZE ) * ( log(inputs->getCV(2) * 10.)  * M_PI * 2. * inputs->getCV(1) ) )   );
+		sine[i] = (float) sin(  (double)i / (double)TABLE_SIZE  * M_PI * 2. )  ;
 	}
 }
 
@@ -156,6 +157,7 @@ bool Audio::start()
 		return false;
 
 	PaError err = Pa_StartStream( stream );
+	begin = clock();
 
 	return (err == paNoError);
 }
@@ -186,14 +188,25 @@ int Audio::paCallbackMethod(const void *inputBuffer, void *outputBuffer,
 
 	createWaveTable();
 
+	float hertz = 32.70; // C1
+
+	float playSpeed = (TABLE_SIZE/(float)SAMPLE_RATE * hertz) * (pow(2, (int)(inputs->getCV(0) * 48.)/12. ) ); //(quantized)don't cast if you want free frequency control
+
+	float modSpeed = (TABLE_SIZE/(float)SAMPLE_RATE * hertz) * (pow(2, (int)(inputs->getCV(1) * 48.)/12. ) );
+	//std::cout<< playSpeed <<std::endl;
+
 	for ( i = 0; i < framesPerBuffer; i++ )
 	{
-		//std::cout<< inputs->getCV(0) <<std::endl;
-		float playSpeed = 5 * inputs->getCV(0);
-		left_phase += playSpeed;
-		if ( left_phase >= TABLE_SIZE ) left_phase -= TABLE_SIZE;
-		right_phase += playSpeed; /* higher pitch so we can distinguish left and right. */
-		if ( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
+		
+		//modPhase += modSpeed;
+		while ( modPhase >= TABLE_SIZE ) modPhase -= TABLE_SIZE;
+
+		left_phase += playSpeed + sine[(int)modPhase] ;
+		if(left_phase < 0) left_phase = 0;
+		while ( left_phase >= TABLE_SIZE ) left_phase -= TABLE_SIZE;
+		right_phase += playSpeed + sine[(int)modPhase] ; /* higher pitch so we can distinguish left and right. */
+		if(right_phase < 0) right_phase = 0;
+		while ( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
 
 
 		*out++ = sine[(int)floor(left_phase)];  /* left */

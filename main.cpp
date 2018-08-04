@@ -235,6 +235,9 @@ static void init_ogl(CUBE_STATE_T *state)
   //disable depth Buffer
   //glDepthMask(false);
 
+  //set 
+  eglSwapInterval( state->display, 2.1);
+
   check();
 }
 
@@ -493,16 +496,19 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
   int offset = 0;
   for (int i = 0; i < bufferL.size(); ++i) {
-    if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
-      state->inputCVList[i] = 0;
-      offset -= 1;
-    }
-    else {
+    // if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
+    //   state->inputCVList[i] = 0;
+    //   offset -= 1;
+    // }
+    // else {
       
       float audioValL = ((*itL + 1.) / 2.);
       float audioValR = ((*itR + 1.) / 2.);
       //std::cout<< audioVal << std::endl; 
-      if(audioValL < 0 || audioValL > 1.){
+      if(audioValR < 0 || audioValR > 1. ){
+        std::cout<< "         WHOA:" << audioValR <<std::endl;
+      }
+      else if(audioValL < 0 || audioValL > 1. ){
         std::cout<< "         WHOA:" << audioValL <<std::endl;
       }
       else{
@@ -510,7 +516,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
       }
       ++itL;
       ++itR;
-    }
+    // }
   }
   //std::cout<< "reading buffer" <<std::endl;
 
@@ -708,7 +714,7 @@ void destroyShader() {
 
 
 //==============================================================================
-#define SHOW_FRAMETIME false
+#define SHOW_FRAMETIME true
 
 int main ()
 {
@@ -754,12 +760,15 @@ int main ()
       draw_triangles(state, cx, cy, 0.003);
     }
 
-
+    clock_t frameEnd = clock();
+    double elapsed_secs = double(frameEnd - frameBegin) / CLOCKS_PER_SEC;
     if (SHOW_FRAMETIME) {
-      clock_t frameEnd = clock();
-      double elapsed_secs = double(frameEnd - frameBegin) / CLOCKS_PER_SEC;
       std::cout << "Frame Time: " << elapsed_secs << std::endl;
     }
+
+    //if(elapsed_secs < .03 ){ sleep(0.03 - elapsed_secs); }
+
+
 
   }
 

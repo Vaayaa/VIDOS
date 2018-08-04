@@ -83,7 +83,7 @@ bool Input::readADC() {
 		}
 		inputMutex.unlock();
 		if (onButton && pressedDown) {
-			//onButton(buttonIn);
+			onButton(buttonIn);
 		}
 		//printf("Button%d\n", buttonIn);
 	}
@@ -129,15 +129,17 @@ bool Input::readSerial() {
 						val = 1024;
 					}
 
-					if (index >= 10) { //cv input
+					if (index >= 10 && index < 30) { //cv input
 
 						setCV(index - 10, val/1024.0);
 					}
+
 
 					else if ( index >= 30 && index < 40) { //button Input
 						inputMutex.lock();
 
 						buttonIn = val;
+						
 						inputMutex.unlock();
 
 						onButton(buttonIn);

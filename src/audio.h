@@ -5,6 +5,7 @@
 #include <thread>
 #include <mutex>
 #include <list>
+#include <time.h>
 
 #define SAMPLE_RATE   (88200)
 #define FRAMES_PER_BUFFER   (1024)
@@ -78,12 +79,14 @@ private:
 	
 	float left_phase;
 	float right_phase;
+	float modPhase = 0.;
 	char message[20];
 	std::thread thread;
 	std::mutex recordMutex;
 
 	float bufferCopy[FRAMES_PER_BUFFER + FRAMES_PER_BUFFER] = {0};
 
+	clock_t begin;
 };
 
 #endif

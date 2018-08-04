@@ -363,9 +363,19 @@ void datBoiFrag(){
 	
 }
 
+void datBoiTest(){
+ 	vec3 texColor = texture2D( texCV, tcoord.xy ).xyz;
+
+ 	float scan = (tcoord.x + tcoord.y * (100. * cv0) )/2.;
+
+ 	float wave =  (sin(scan * TWO_PI  )  + 1.)/2.  ;
+
+	gl_FragColor = vec4( vec3( texColor.x ), 1.0);
+}
+
 void main( void ) {
 	//datBoiFrag();
-	vec3 texColor = texture2D( texCV, tcoord.xy ).xyz;
-	gl_FragColor = vec4( vec3(texColor.x), 1.0);
+	datBoiTest();
+	
 
 }
