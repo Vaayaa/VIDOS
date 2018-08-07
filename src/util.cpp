@@ -43,4 +43,9 @@ static unsigned short ushortColor( float red, float green, float blue) {
 }
 
 
+static float charToAudioFloat(unsigned char c){
+  return ((float)c / 255. - 0.5) * 2.;
+}
+
+
 #endif

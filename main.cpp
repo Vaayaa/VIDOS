@@ -8,13 +8,15 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <thread>
 
 #include <linux/input.h>
-#include <sys/inotify.h>
+
 
 //gl Includes
 #include "bcm_host.h"
 #include "GLES2/gl2.h"
+#include "GLES2/gl2ext.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 
@@ -23,6 +25,7 @@
 #include "lib/SOIL.h"
 #include "src/input.h"
 #include "src/audio.h"
+#include "src/fileWatcher.h"
 
 //Global defines
 #include <time.h>
@@ -38,6 +41,7 @@ bool programRunning = true;
 
 Input* inputs;
 Audio* audio;
+FileWatcher* watcher;
 
 bool loadNewScene = false;
 float lastButtonState = 0;
@@ -72,6 +76,15 @@ typedef struct
   GLuint tex[4];
   GLuint buf;
 
+  //create pixel buffer pointer (for passing color into audio engine)
+  GLubyte* pixels;
+  int pixelsSize;
+
+  //audio to video vars
+  std::vector<float> buffer1;
+  std::vector<float> buffer2;
+
+
 
   //unsigned char* fb_buf; //feedback disabled
   unsigned char* inputImageTexBuf;
@@ -84,8 +97,8 @@ typedef struct
 } CUBE_STATE_T;
 
 static CUBE_STATE_T _state, *state = &_state;
-
-#define check() ;//if(glGetError() != 0) std::cout << "GL ERROR on line: "<< __LINE__ <<std::endl; assert(glGetError() == 0); 
+int e;
+#define check() e = glGetError(); if(e != 0) std::cout << "GL ERROR "<< e << " on line: "<< __LINE__ <<std::endl; assert(glGetError() == 0); 
 
 static void checkFramebuffer() {
   GLenum ret = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -102,7 +115,7 @@ static void showlog(GLint shader)
   // Prints the compile log for a shader
   char log[1024];
   glGetShaderInfoLog(shader, sizeof log, NULL, log);
-  printf("%d:shader:\n%s\n", shader, log);
+  printf("\n%d:shader:\n%s\n", shader, log);
 }
 
 static void showprogramlog(GLint shader)
@@ -110,7 +123,7 @@ static void showprogramlog(GLint shader)
   // Prints the information log for a program object
   char log[1024];
   glGetProgramInfoLog(shader, sizeof log, NULL, log);
-  printf("%d:program:\n%s\n", shader, log);
+  printf("\n%d:program:\n%s\n", shader, log);
 }
 
 static std::string getExecutablePath() {
@@ -239,6 +252,11 @@ static void init_ogl(CUBE_STATE_T *state)
   eglSwapInterval( state->display, 2.1);
 
   check();
+
+  state->pixelsSize = state->screen_width * state->screen_height * 3;
+  state->pixels = new GLubyte[state->pixelsSize];
+
+  std::cout<< "GL VERSION: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 }
 
 std::string readFile(const char *filePath) {
@@ -270,8 +288,7 @@ static void load_tex_images(CUBE_STATE_T *state)
 
 }
 
-
-static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
+static void init_shaders( bool firstrun = true)
 {
   // Points for a screen size poly to draw the shader on
   static const GLfloat vertex_data[] = {
@@ -331,6 +348,7 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
   if (state->verbose)
     showprogramlog(state->program);
 
+  //set up input uniforms
 
   state->attr_vertex = glGetAttribLocation(state->program, "vertex");
   state->unif_color  = glGetUniformLocation(state->program, "color");
@@ -432,7 +450,9 @@ static void init_shaders(CUBE_STATE_T *state, bool firstrun = true)
 
 }
 
-
+static void restart_shaders(){
+  loadNewScene = true;
+}
 
 
 static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat scale)
@@ -487,36 +507,38 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
   //INTERNAL OSCS VER
   //get audio buffer and feed that into an input
-  std::list<float> bufferL = audio->getBuffer(0);
-  std::list<float> bufferR = audio->getBuffer(1);
-  double texDim = sqrt(bufferL.size());
+  if( audio->hasNewBuffer()){
+    state->buffer1 = audio->getBuffer(0);
+    state->buffer2 = audio->getBuffer(1);
+  }
+  double texDim = sqrt(state->buffer1.size());
 
-  std::list<float>::iterator itL = bufferL.begin();
-  std::list<float>::iterator itR = bufferR.begin();
+  std::vector<float>::iterator it1 = state->buffer1.begin();
+  std::vector<float>::iterator it2 = state->buffer2.begin();
 
   int offset = 0;
-  for (int i = 0; i < bufferL.size(); ++i) {
-    // if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
-    //   state->inputCVList[i] = 0;
-    //   offset -= 1;
-    // }
-    // else {
+  for (int i = 0; i < state->buffer1.size(); ++i) {
+    if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
+      state->inputCVList[i] = 0;
+      offset -= 1;
+    }
+    else {
       
-      float audioValL = ((*itL + 1.) / 2.);
-      float audioValR = ((*itR + 1.) / 2.);
+      float audioVal1 = ((*it1 + 1.) / 2.);
+      float audioVal2 = ((*it2 + 1.) / 2.);
       //std::cout<< audioVal << std::endl; 
-      if(audioValR < 0 || audioValR > 1. ){
-        std::cout<< "         WHOA:" << audioValR <<std::endl;
+      if(audioVal1 < 0 || audioVal1 > 1. ){
+        std::cout<< "         WHOA:" << audioVal1 <<std::endl;
       }
-      else if(audioValL < 0 || audioValL > 1. ){
-        std::cout<< "         WHOA:" << audioValL <<std::endl;
+      else if(audioVal2 < 0 || audioVal2 > 1. ){
+        std::cout<< "         WHOA:" << audioVal2 <<std::endl;
       }
       else{
-        state->inputCVList[i] = ushortColor( audioValL , audioValR , 0);
+        state->inputCVList[i] = ushortColor( audioVal1 , audioVal2 , 0);
       }
-      ++itL;
-      ++itR;
-    // }
+      ++it1;
+      ++it2;
+    }
   }
   //std::cout<< "reading buffer" <<std::endl;
 
@@ -527,7 +549,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
   check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
   check();
 
   glUniform1f(state->unif_cv0, state->inputCV0);
@@ -576,9 +598,24 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glFinish();
   check();
 
+   //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width   , state->screen_height  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  
+  glReadPixels(0,0, state->screen_width, state->screen_height, GL_RGB, GL_UNSIGNED_BYTE, state->pixels);
+
+  // for( int x = 0 ; x < 6; ++x){
+  //   std::cout << (int)state->pixels[x] << " " ;
+  // }
+  // std::cout <<std::endl;
+
+  check();
+
 
   eglSwapBuffers(state->display, state->surface);
   check();
+
+
+  //load color into audio
+  audio->loadByteWaveTable( state->pixels, state->pixelsSize );
 
 
 }
@@ -641,7 +678,6 @@ void onButton(bool button) {
     loadNewScene = true;
   }
   lastButtonState = buttonState;
-  //~ init_shaders(state);
 }
 
 
@@ -714,7 +750,7 @@ void destroyShader() {
 
 
 //==============================================================================
-#define SHOW_FRAMETIME true
+#define SHOW_FRAMETIME false
 
 int main ()
 {
@@ -731,12 +767,14 @@ int main ()
 
   //Start Audio Engine
   audio = new Audio(inputs);
-
   std::cout << "Audio Started" << std::endl;
+
+  watcher = new FileWatcher(getExecutablePath() + "Shaders", &restart_shaders);
+  
 
   // Start OGLES
   init_ogl(state);
-  init_shaders(state);
+  init_shaders();
   cx = state->screen_width / 2;
   cy = state->screen_height / 2;
 
@@ -753,22 +791,20 @@ int main ()
     else if (loadNewScene  == true) {
       destroyShader();
       init_ogl(state);
-      init_shaders(state, false);
+      init_shaders(false);
       loadNewScene = false;
     }
     else {
       draw_triangles(state, cx, cy, 0.003);
     }
 
-    clock_t frameEnd = clock();
-    double elapsed_secs = double(frameEnd - frameBegin) / CLOCKS_PER_SEC;
     if (SHOW_FRAMETIME) {
+      clock_t frameEnd = clock();
+      double elapsed_secs = double(frameEnd - frameBegin) / CLOCKS_PER_SEC;
       std::cout << "Frame Time: " << elapsed_secs << std::endl;
     }
 
     //if(elapsed_secs < .03 ){ sleep(0.03 - elapsed_secs); }
-
-
 
   }
 
@@ -777,7 +813,8 @@ int main ()
   fprintf(stderr, "%s.\n", strerror(errno));
 
   delete(inputs);
-  delete(audio);
+  // delete(audio);
+  delete(state->pixels);
 
 
   return 0;

@@ -16,6 +16,8 @@ uniform sampler2D texFB;
 uniform sampler2D texCV;
 uniform sampler2D texIN;
 
+varying vec4 outColor;
+
 #define PI 3.14159265358979323846
 #define TWO_PI 6.28318530718
 
@@ -363,19 +365,30 @@ void datBoiFrag(){
 	
 }
 
+float osc(float scan, float frequency, float phase, float drift){
+	return  (sin(scan * frequency + (drift * time) + phase ) );
+}
+
 void datBoiTest(){
  	vec3 texColor = texture2D( texCV, tcoord.xy ).xyz;
 
- 	float scan = (tcoord.x + tcoord.y * (100. * cv0) )/2.;
+ 	float scan = ((tcoord.x * 100.) + (tcoord.y * 100. ) * 100.) / 1000.  ;
 
- 	float wave =  (sin(scan * TWO_PI  )  + 1.)/2.  ;
+ 	float syncDrift = 0.5;
+	
+	float f1 = 100. * cv0;
+	float f2 = 100. * cv1;
+	float f3 = 100. * cv2;
+	
+	float osc1 = osc(scan, f1, 0., syncDrift) * 1.;
+	float osc2 = osc(scan, f2, 0., syncDrift) * 1.;
+	float osc3 = osc(scan, f3, 0., syncDrift) * 0.;
 
-	gl_FragColor = vec4( vec3( texColor.x ), 1.0);
+	gl_FragColor = vec4( vec3( osc1, osc2 , texColor.x ), 1.0 );
 }
 
 void main( void ) {
-	//datBoiFrag();
-	datBoiTest();
-	
+	datBoiFrag();
+	//datBoiTest();
 
 }

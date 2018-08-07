@@ -5,17 +5,18 @@
 #include <thread>
 #include <mutex>
 #include <list>
+#include <vector>
 #include <time.h>
 
-#define SAMPLE_RATE   (88200)
-#define FRAMES_PER_BUFFER   (1024)
+#define SAMPLE_RATE   (192000)
+#define FRAMES_PER_BUFFER   (2560)
 #define TABLE_SIZE   (800)
 
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 
-#define RECORD_BUFFER  (4096)
+#define RECORD_BUFFER  (2560)
 
 class Input;
 
@@ -30,11 +31,13 @@ public:
 	bool close();
 	bool start();
 	bool stop();
-
 	bool run();
 
 	int getFramesPerBuffer();
-	std::list<float> getBuffer(int index);
+	bool hasNewBuffer();
+	std::vector<float> getBuffer(int index);
+
+	void loadByteWaveTable(unsigned char* table, int size);
 
 private:
 	void createWaveTable();
@@ -75,16 +78,27 @@ private:
 
 	PaStream *stream;
 	float sine[TABLE_SIZE];
-	std::list<float> buffer[2] = {std::list<float>(RECORD_BUFFER, 0.0), std::list<float>(RECORD_BUFFER, 0.0)};
+	unsigned char* loadedWaveTable;
+	int loadedWaveTableSize = 0;
+	bool newBufferFlag = false;
+	std::vector< float > frameBuffer[2] = {std::vector<float>(RECORD_BUFFER, 0.0), std::vector<float>(RECORD_BUFFER, 0.0)};
+	std::vector<float>::iterator lastFrameL;
+	std::vector<float>::iterator lastFrameR;
+	//std::vector<float> buffer = std::vector<float>(RECORD_BUFFER, 0.0);
+
 	
 	float left_phase;
+	float carrier_phase;
+	float mod_phase;
 	float right_phase;
-	float modPhase = 0.;
+	float fm_phase = 0.;
 	char message[20];
 	std::thread thread;
 	std::mutex recordMutex;
+	
 
-	float bufferCopy[FRAMES_PER_BUFFER + FRAMES_PER_BUFFER] = {0};
+	std::vector<float> bufferCopyL = std::vector<float>(FRAMES_PER_BUFFER, 0.);
+	std::vector<float> bufferCopyR = std::vector<float>(FRAMES_PER_BUFFER, 0.);
 
 	clock_t begin;
 };
