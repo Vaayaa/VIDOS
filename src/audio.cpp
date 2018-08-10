@@ -37,10 +37,10 @@ private:
 };
 
 Audio::Audio(): stream(0), left_phase(0), right_phase(0){
-
-	createWaveTable();
-	//start the audio thread (basically just sleeps while audio runs in the background, not sure how to do this correctly)
-	thread = std::thread(&Audio::run, this );
+	//dont do anything here ( unless you check for duplicate threads later)
+	// createWaveTable();
+	// //start the audio thread (basically just sleeps while audio runs in the background, not sure how to do this correctly)
+	// thread = std::thread(&Audio::run, this );
 	
 }
 

@@ -84,8 +84,6 @@ typedef struct
   std::vector<float> buffer1;
   std::vector<float> buffer2;
 
-
-
   //unsigned char* fb_buf; //feedback disabled
   unsigned char* inputImageTexBuf;
   int buf_height, buf_width;
@@ -491,55 +489,55 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
   //OLD VER ( CV LIST ONLY )
   //get sqrt of the list size to find out a dimension of the square texture
-  // double texDim = sqrt(CV_LIST_SIZE);
-  //copy CV list into uniform array
-  // std::vector<float> cvlist[3] = {inputs->getCVList(3), inputs->getCVList(4), inputs->getCVList(5)} ;
-  // int offset = 0;
-  // for (int i = 0; i < CV_LIST_SIZE; ++i) {
-  //   if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
-  //     state->inputCVList[i] = 0;
-  //     offset -= 1;
-  //   }
-  //   else {
-  //     state->inputCVList[i] = ushortColor( cvlist[1][i + offset], cvlist[1][i + offset], cvlist[2][i + offset]);
-  //   }
-  // }
-
-  //INTERNAL OSCS VER
-  //get audio buffer and feed that into an input
-  if( audio->hasNewBuffer()){
-    state->buffer1 = audio->getBuffer(0);
-    state->buffer2 = audio->getBuffer(1);
-  }
-  double texDim = sqrt(state->buffer1.size());
-
-  std::vector<float>::iterator it1 = state->buffer1.begin();
-  std::vector<float>::iterator it2 = state->buffer2.begin();
-
+  double texDim = sqrt(CV_LIST_SIZE);
+  // //copy CV list into uniform array
+  std::vector<float> cvlist[3] = {inputs->getCVList(3), inputs->getCVList(4), inputs->getCVList(5)} ;
   int offset = 0;
-  for (int i = 0; i < state->buffer1.size(); ++i) {
+  for (int i = 0; i < CV_LIST_SIZE; ++i) {
     if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
       state->inputCVList[i] = 0;
       offset -= 1;
     }
     else {
-      
-      float audioVal1 = ((*it1 + 1.) / 2.);
-      float audioVal2 = ((*it2 + 1.) / 2.);
-      //std::cout<< audioVal << std::endl; 
-      if(audioVal1 < 0 || audioVal1 > 1. ){
-        std::cout<< "         WHOA:" << audioVal1 <<std::endl;
-      }
-      else if(audioVal2 < 0 || audioVal2 > 1. ){
-        std::cout<< "         WHOA:" << audioVal2 <<std::endl;
-      }
-      else{
-        state->inputCVList[i] = ushortColor( audioVal1 , audioVal2 , 0);
-      }
-      ++it1;
-      ++it2;
+      state->inputCVList[i] = ushortColor( cvlist[1][i + offset], cvlist[1][i + offset], cvlist[2][i + offset]);
     }
   }
+
+  //INTERNAL OSCS VER
+  //get audio buffer and feed that into an input
+  // if( audio->hasNewBuffer()){
+  //   state->buffer1 = audio->getBuffer(0);
+  //   state->buffer2 = audio->getBuffer(1);
+  // }
+  // double texDim = sqrt(state->buffer1.size());
+
+  // std::vector<float>::iterator it1 = state->buffer1.begin();
+  // std::vector<float>::iterator it2 = state->buffer2.begin();
+
+  // int offset = 0;
+  // for (int i = 0; i < state->buffer1.size(); ++i) {
+  //   if (i != 0 && (i % (int)texDim) == texDim) { // zero value at start of every line (GL formating for textures is like this, not sure why)
+  //     state->inputCVList[i] = 0;
+  //     offset -= 1;
+  //   }
+  //   else {
+      
+  //     float audioVal1 = ((*it1 + 1.) / 2.);
+  //     float audioVal2 = ((*it2 + 1.) / 2.);
+  //     //std::cout<< audioVal << std::endl; 
+  //     if(audioVal1 < 0 || audioVal1 > 1. ){
+  //       std::cout<< "         WHOA:" << audioVal1 <<std::endl;
+  //     }
+  //     else if(audioVal2 < 0 || audioVal2 > 1. ){
+  //       std::cout<< "         WHOA:" << audioVal2 <<std::endl;
+  //     }
+  //     else{
+  //       state->inputCVList[i] = ushortColor( audioVal1 , audioVal2 , 0);
+  //     }
+  //     ++it1;
+  //     ++it2;
+  //   }
+  //}
   //std::cout<< "reading buffer" <<std::endl;
 
   glBindTexture(GL_TEXTURE_2D, state->tex[1]);
@@ -614,8 +612,8 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   check();
 
 
-  //load color into audio
-  audio->loadByteWaveTable( state->pixels, state->pixelsSize );
+  // //load color into audio
+  // audio->loadByteWaveTable( state->pixels, state->pixelsSize );
 
 
 }
@@ -766,8 +764,8 @@ int main ()
   inputs = new Input();
 
   //Start Audio Engine
-  audio = new Audio(inputs);
-  std::cout << "Audio Started" << std::endl;
+  // audio = new Audio(inputs);
+  // std::cout << "Audio Started" << std::endl;
 
   watcher = new FileWatcher(getExecutablePath() + "Shaders", &restart_shaders);
   

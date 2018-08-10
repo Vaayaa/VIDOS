@@ -64,11 +64,14 @@ bool Input::readADC() {
 		{
 			//read in ADC values
 			int val = analogRead( BASE + chan);
-			// int smoothVal;
-			setCV(chan, val / 1024.0);
+			int smoothVal = smooth(val, lastSmoothCV[chan]);
+			if(smoothVal > -1){
+				lastSmoothCV[chan] = val;
+				setCV(chan, smoothVal / 1024.0);
 
-			// if( chan == 6)
-			// 	printf("%d: %d \n", chan, val);
+				//if( chan == 6)
+				//printf("%d: %d lst: %d \n", chan, val, lastSmoothCV[chan]);
+			}
 		}
 
 		//read button pin
@@ -211,13 +214,14 @@ std::vector<float> Input::getCVList(int index) {
 }
 
 int Input::smooth(int in, int PrevVal) {
-	int margin = PrevVal * .008; //  get 2% of the raw value.  Tune for lowest non-jitter value.
+	int margin = PrevVal * 0.000001; //  get 2% of the raw value.  Tune for lowest non-jitter value.
+
 	/*
 	 * Next we add (or subtract...) the 'standard' fixed value to the previous reading. (PotPrevVal needs to be declared outside the function so it persists.)
 	 * Here's the twist: Since the jitter seems to be worse at high raw vals, we also add/subtract the 2% of total raw. Insignificantat on low
 	 * raw vals, but enough to remove the jitter at raw >900 without wrecking linearity or adding 'lag', or slowing down the loop, etc.
 	 */
-	if (in > PrevVal + (4 + margin) || in < PrevVal - (5 + margin)) { // a 'real' change in value? Tune the two numeric values for best results
+	if (in > PrevVal + (3 + margin) || in < PrevVal - (3 + margin)) { // a 'real' change in value? Tune the two numeric values for best results
 
 		//average last 2 values ofr smoothing
 		in = (PrevVal + in) / 2.0;

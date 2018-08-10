@@ -344,13 +344,12 @@ void datBoiFrag(){
 
 	//Color Quantization(?) / Palette Selector
 
-	vec3 hue = pallete(cv6 * .6666);
-
+	vec3 hue = pallete(cv0 * .6666);
 
 	//OSC
-	vec3 oscA = colorizer(texColor.x, hue[0], cv1 );
-	vec3 oscB = colorizer(texColor.y, hue[1],  cv1  );
-	vec3 oscC = colorizer(texColor.z, hue[2],  cv1 );
+	vec3 oscA = colorizer(texColor.x, hue[0], 1. );
+	vec3 oscB = colorizer(texColor.y, hue[1],  1.  );
+	vec3 oscC = colorizer(texColor.z, hue[2],  1. );
 	
 
 	//Feedback
@@ -366,29 +365,143 @@ void datBoiFrag(){
 }
 
 float osc(float scan, float frequency, float phase, float drift){
-	return  (sin(scan * frequency + (drift * time) + phase ) );
+	return  (sin(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+}
+float getScan(vec2 position, float rotation, float polar){
+	position = rotate2D(position, rotation);
+
+	vec2 polarPos = toPolar(position) ;
+	vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
+	polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
+
+	float ret = mix( ((position.x * 100.) + (position.y * 100.) * 100.)/1000., sin(polarPos.y * 8.) , polar);
+	return ret;
 }
 
+
+vec3 mux(float p1){
+	//expects 0 to 1 range
+
+	float p2 = fract(p1 * 10.) ;
+	float p3 = fract(p2 * 10.);
+
+	return vec3(p1, p2, p3);
+}
+
+
+// divides cv into 2 values 1: 0.5 to 1 -> 0 to 1
+// 							2: .5 to 0 -> o to 1
+vec2 splitCV(float cv){ 
+	vec2 ret = vec2(0.0, 0.0);
+	if( cv >= 0.5){
+		ret[0] = (cv - 0.5) * 2.;
+	}
+
+	if (cv < 0.5){
+		ret[1] = (abs(cv - 1.) - 0.5) * 2.;
+	}
+
+	return ret;
+}
+
+vec3 mixMode(vec3 shape, vec3 osc, float cv, int mode){
+	vec2 cv2split = splitCV(cv);
+	//osc 1 0: min/max 1: +/- 2: * //
+
+	if( mode == 0){
+		shape =  ( shape + ( osc  * cv2split[0]) + shape - (osc * cv2split[1]) ) ;
+	}
+	else if( mode == 1){
+		shape = ( pow(shape,  ( osc  * cv2split[0])) + shape / (osc * cv2split[1]) ) ;
+	}
+	else{
+		shape = ( max(shape, ( osc  * cv2split[0])) + min( shape, (osc * cv2split[1]) ) ) ;
+	}
+	return shape;
+}
+
+float mixMode(float shape, float osc, float cv, int mode){
+	vec2 cv2split = splitCV(cv);
+	//osc 1 0: min/max 1: +/- 2: * //
+
+	if( mode == 0){
+		shape =  ( shape + ( osc  * cv2split[0]) + shape - (osc * cv2split[1]) ) ;
+	}
+	else if( mode == 1){
+		shape = ( shape * ( osc  * cv2split[0]) + shape / (osc * cv2split[1]) ) ;
+	}
+	else{
+		shape = ( max(shape, ( osc  * cv2split[0])) + min( shape, (osc * cv2split[1]) ) ) ;
+	}
+	return shape;
+}
+
+
 void datBoiTest(){
- 	vec3 texColor = texture2D( texCV, tcoord.xy ).xyz;
+	vec2 texPos = tcoord;
+	vec3 texColor = texture2D( texCV, texPos ).xyz;
 
- 	float scan = ((tcoord.x * 100.) + (tcoord.y * 100. ) * 100.) / 1000.  ;
-
- 	float syncDrift = 0.5;
+ 	vec2 position = tcoord;
 	
-	float f1 = 100. * cv0;
-	float f2 = 100. * cv1;
-	float f3 = 100. * cv2;
-	
-	float osc1 = osc(scan, f1, 0., syncDrift) * 1.;
-	float osc2 = osc(scan, f2, 0., syncDrift) * 1.;
-	float osc3 = osc(scan, f3, 0., syncDrift) * 0.;
+	float scale = 1. ;
+	position = position * scale;
 
-	gl_FragColor = vec4( vec3( osc1, osc2 , texColor.x ), 1.0 );
+	vec3 rot = mux(0.);
+	rot[0] = 0.;//cv1;
+	rot[1] = 0.5;
+	rot[2] = .8;
+	
+	float scan0 = getScan(position, rot[0] * PI, 0.);
+
+	
+	float syncDrift = .1 ;
+	
+	//vec3 freq = mux(cv0);
+	float f1 = 4.;
+	float f2 = 3. ;
+	float f3 = 10. ;
+
+	
+	float osc1, osc2, osc3;
+	
+	osc1 = osc(scan0, f1, 0., syncDrift ) * 1. ;
+	float scan1 = getScan(position, rot[1] * PI, 1.) + osc1 ;
+	osc2 = osc(scan1, f2, 0., syncDrift ) * 1.;
+	float scan2 = getScan(position , rot[2] * PI , 0.);
+	osc3 = osc(scan2, f3 , 0., syncDrift ) * 1.;
+
+	
+	vec3 hue = pallete( 0.12 * .6666 );
+	
+	float shape = 0.;
+	//osc 1 0: min/max 1: +/- 2: * //
+
+	//osc1 = max(max(osc2 , osc1), osc3 ) * cv2split[0] + min(min(osc2 , osc1), osc3) * cv2split[1];
+	//osc1 = ( osc2 + osc1 + osc3 ) * cv2split[0] + ( osc2 - osc1 - osc3 ) * cv2split[1];
+	//osc1 = ( osc2 * osc1 * osc3 ) * cv2split[0] + ( osc1/ osc2 / osc3 ) * cv2split[1];
+
+
+	vec3 oscA = colorizer(osc1, hue[0],   1. ) * 1.;
+	vec3 oscB = colorizer(osc2, hue[1] + osc2 ,  1. ) * 1.;
+	vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
+
+	
+	//Feedback
+	vec3 fbColor = texture2D( texFB, position ).xyz * .1 * 2.;
+
+	//Mixer
+	vec3 color = vec3(0.);
+	color = mixMode(color, oscA, cv0 , 0) ;
+	color = mixMode(color, oscB, cv1 , 0) ;
+	color = mixMode(color, oscC, cv2 , 1) ;
+	//oscA; //+ oscB + oscC;
+	color += fbColor; 
+
+	gl_FragColor = vec4( color, 1.0 );
 }
 
 void main( void ) {
-	datBoiFrag();
-	//datBoiTest();
+	//datBoiFrag();
+	datBoiTest();
 
 }

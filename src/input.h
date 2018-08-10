@@ -27,12 +27,14 @@ public:
 
 private:
 	//options
-	bool useSerial = true;
+	bool useSerial = false;
+
 
 	int serialFd;
 	float cvIn[CV_COUNT] = {0};
 	std::vector<float> lastCV[CV_COUNT] = {std::vector<float>(CV_LIST_SIZE, 0.0), std::vector<float>(CV_LIST_SIZE, 0.0), std::vector<float>(CV_LIST_SIZE, 0.0) , std::vector<float>(CV_LIST_SIZE, 0.0) , std::vector<float>(CV_LIST_SIZE, 0.0) , std::vector<float>(CV_LIST_SIZE, 0.0) , std::vector<float>(CV_LIST_SIZE, 0.0) , std::vector<float>(CV_LIST_SIZE, 0.0) };
 	float lastCVRead[CV_COUNT] = {0.};
+	int lastSmoothCV[CV_COUNT] = {0};
 	int buttonIn = 0;
 
 	std::function<void(bool)> onButton;
