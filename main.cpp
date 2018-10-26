@@ -64,8 +64,15 @@ typedef struct
   GLfloat inputCV0 = 0.0;
   GLfloat inputCV1 = 0.0;
   GLfloat inputCV2 = 0.;
+  GLfloat inputCV3 = 0.;
+  GLfloat inputCV4 = 0.;
+  GLfloat inputCV5 = 0.;
   GLfloat inputCV6 = 0.0;
   GLfloat inputCV7 = 0.0;
+
+  GLint switch1 = 0;
+  GLint switch2 = 0;
+  GLint switch3 = 0;
 
   GLfloat inputFFT[4] = {0.0, 0.0, 0.0, 0.0};
   GLuint vshader;
@@ -88,7 +95,7 @@ typedef struct
   unsigned char* inputImageTexBuf;
   int buf_height, buf_width;
 // my shader attribs
-  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2, unif_cv6, unif_cv7, unif_fft;
+  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw1, unif_sw2, unif_sw3;
   GLuint unif_inputVal, unif_sceneIndex;
 
   GLuint unif_time;
@@ -363,9 +370,17 @@ static void init_shaders( bool firstrun = true)
   state->unif_cv0 = glGetUniformLocation(state->program, "cv0");
   state->unif_cv1 = glGetUniformLocation(state->program, "cv1");
   state->unif_cv2 = glGetUniformLocation(state->program, "cv2");
+  state->unif_cv3 = glGetUniformLocation(state->program, "cv3");
+  state->unif_cv4 = glGetUniformLocation(state->program, "cv4");
+  state->unif_cv5 = glGetUniformLocation(state->program, "cv5");
   state->unif_cv6 = glGetUniformLocation(state->program, "cv6");
   state->unif_cv7 = glGetUniformLocation(state->program, "cv7");
   state->unif_fft = glGetUniformLocation(state->program, "fft");
+
+  //switches
+  state->unif_sw1 = glGetUniformLocation(state->program, "sw1");
+  state->unif_sw2 = glGetUniformLocation(state->program, "sw2");
+  state->unif_sw3 = glGetUniformLocation(state->program, "sw3");
 
 
 
@@ -389,7 +404,7 @@ static void init_shaders( bool firstrun = true)
   check();
 
   //usually has "/ CONTEXT_DIV " this isnt working in some cases for some reason
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width   , state->screen_height  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width  , state->screen_height , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
   check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -482,10 +497,17 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   state->inputCV0 = abs( inputs->getCV(0) ); //inputs->getCV(0) +
   state->inputCV1 = abs(  inputs->getCV(1) ); //inputs->getCV(1) +
   state->inputCV2 = abs(  inputs->getCV(2) ); // inputs->getCV(2) +
-
-  //sliders
+  state->inputCV3 = abs(  inputs->getCV(3) );
+  state->inputCV4 = abs(  inputs->getCV(4) );
+  state->inputCV5 = abs(  inputs->getCV(5) );
   state->inputCV6 = abs(  inputs->getCV(6) );
   state->inputCV7 = abs(  inputs->getCV(7) );
+
+
+  //pass switches into shader
+  state->switch1 =  inputs->getSwitch(0);
+  state->switch2 =  inputs->getSwitch(1);
+  state->switch3 =  inputs->getSwitch(2);
 
   //OLD VER ( CV LIST ONLY )
   //get sqrt of the list size to find out a dimension of the square texture
@@ -553,6 +575,9 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glUniform1f(state->unif_cv0, state->inputCV0);
   glUniform1f(state->unif_cv1, state->inputCV1);
   glUniform1f(state->unif_cv2, state->inputCV2);
+  glUniform1f(state->unif_cv3, state->inputCV3);
+  glUniform1f(state->unif_cv4, state->inputCV4);
+  glUniform1f(state->unif_cv5, state->inputCV5);
   glUniform1f(state->unif_cv6, state->inputCV6);
   glUniform1f(state->unif_cv7, state->inputCV7);
   glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?

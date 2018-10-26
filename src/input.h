@@ -6,8 +6,10 @@
 #include <functional>
 #include <vector>
 
+#define SWITCH_COUNT 3
 #define CV_LIST_SIZE 400
 #define CV_COUNT 8
+
 
 class Input
 {
@@ -17,9 +19,10 @@ public:
 
 	void update();
 	void addButtonCallback(std::function<void(bool)> buttonCallback);
-	void setCV (int index, float val);
+	
 	std::vector<float> getCVList(int index);
-	float getCV(int i);
+	float getCV(int index);
+	int getSwitch(int index);
 
 
 	std::thread inputThread;
@@ -37,10 +40,17 @@ private:
 	int lastSmoothCV[CV_COUNT] = {0};
 	int buttonIn = 0;
 
+	//3pos Switches
+	int switches[SWITCH_COUNT] = {0};
+
+	void setCV (int index, float val);
+	void set3PosSwitch(int index, int pin1, int pin2);
+
 	std::function<void(bool)> onButton;
 
 	bool setupSerial();
 	bool readSerial();
+	bool readSwitches();
 	bool setupADC();
 	bool readADC();
 	static int smooth(int in, int PrevVal);

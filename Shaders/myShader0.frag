@@ -3,11 +3,20 @@ uniform vec2 scale;
 uniform vec2 centre;
 uniform vec2 inputVal;
 uniform vec2 resolution;
+
 uniform float cv0;
 uniform float cv1;
 uniform float cv2;
+uniform float cv3;
+uniform float cv4;
+uniform float cv5;
 uniform float cv6;
 uniform float cv7;
+
+uniform int sw1;
+uniform int sw2;
+uniform int sw3;
+
 varying vec2 tcoord;
 uniform float time;
 uniform int sceneIndex;
@@ -447,25 +456,28 @@ void datBoiTest(){
 	position = position * scale;
 
 	vec3 rot = mux(0.);
-	rot[0] = 0.;//cv1;
-	rot[1] = 0.5;
-	rot[2] = .8;
+	// rot[0] = cv0 * TWO_PI;
+	// rot[1] = cv1 * TWO_PI;
+	// rot[2] = cv2 * TWO_PI;
 	
 	float scan0 = getScan(position, rot[0] * PI, 0.);
 
 	
 	float syncDrift = .1 ;
+	if(sw1 == 2){
+		syncDrift = 0.;
+	}
 	
 	//vec3 freq = mux(cv0);
-	float f1 = 4.;
-	float f2 = 3. ;
-	float f3 = 10. ;
+	float f1 = cv0 * 50.;
+	float f2 = cv1 * 50.;
+	float f3 = cv2 * 50.;
 
 	
 	float osc1, osc2, osc3;
 	
 	osc1 = osc(scan0, f1, 0., syncDrift ) * 1. ;
-	float scan1 = getScan(position, rot[1] * PI, 1.) + osc1 ;
+	float scan1 = getScan(position, rot[1] * PI, 0.) + osc1 ;
 	osc2 = osc(scan1, f2, 0., syncDrift ) * 1.;
 	float scan2 = getScan(position , rot[2] * PI , 0.);
 	osc3 = osc(scan2, f3 , 0., syncDrift ) * 1.;
@@ -493,15 +505,42 @@ void datBoiTest(){
 	vec3 color = vec3(0.);
 	color = mixMode(color, oscA, cv0 , 0) ;
 	color = mixMode(color, oscB, cv1 , 0) ;
-	color = mixMode(color, oscC, cv2 , 1) ;
-	//oscA; //+ oscB + oscC;
+	color = mixMode(color, oscC, cv2 , 0) ;
+	// color = oscA + oscB + ;
 	color += fbColor; 
 
+	//color = vec3(cv3);
+
+	
+}
+
+void fbBased(){
+	vec2 texPos = tcoord;
+	vec3 texColor = texture2D( texCV, texPos ).xyz;
+
+ 	vec2 position = tcoord;
+	
+	float scale = 1. ;
+	position = position * scale;
+
+	float syncDrift = 0.1 ;
+	float scan0 = getScan(position, 0. , 0.);
+	float f1 = cv0 * 10.;
+
+	float osc1 = osc(scan0, f1, 0., syncDrift );
+
+	vec3 color = vec3(0.) + osc1;
+
+	vec2 fbPos = toPolar(position + (osc1 * cv1) ) ;
+	//Feedback
+	vec3 fbColor = texture2D( texFB, fbPos ).xyz * .1 * 2.;
+
+	color += fbColor; 
 	gl_FragColor = vec4( color, 1.0 );
 }
 
 void main( void ) {
 	//datBoiFrag();
-	datBoiTest();
+	fbBased();
 
 }
