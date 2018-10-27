@@ -92,45 +92,30 @@ bool Input::readADC() {
 			int smoothVal = smooth(val, lastSmoothCV[chan]);
 			if(smoothVal > -1){
 				lastSmoothCV[chan] = val;
-				setCV(chan, val / 1024.0);
+				setCV(chan, smoothVal / 1024.0);
 
-				
+				//if( chan == 6)
+				//printf("%d: %d lst: %d \n", chan, val, lastSmoothCV[chan]);
 			}
-			// if( chan == 4)
-			// 	printf("%d: %d lst: %d \n", chan, val, lastSmoothCV[chan]);
 		}
 
-		readSwitches();
-
-		
+		//read button pin
+		int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
+		bool pressedDown = false;
+		inputMutex.lock();
+		if (val != buttonIn) {
+			if (!buttonIn) {
+				pressedDown = true;
+			}
+			buttonIn = val;
+		}
+		inputMutex.unlock();
+		if (onButton && pressedDown) {
+			onButton(buttonIn);
+		}
+		//printf("Button%d\n", buttonIn);
 	}
 
-
-
-	return true;
-}
-
-bool Input::readSwitches(){
-	//read switches
-
-	set3PosSwitch(0, 4, 5);
-	set3PosSwitch(1, 0, 2);
-	set3PosSwitch(2, 22, 23);
-
-
-	// // bool pressedDown = false;
-	// inputMutex.lock();
-	// if (val != buttonIn) {
-	// 	if (!buttonIn) {
-	// 		pressedDown = true;
-	// 	}
-	// 	buttonIn = val;
-	// }
-	// inputMutex.unlock();
-	// if (onButton && pressedDown) {
-	// 	onButton(buttonIn);
-	// }
-	//printf("Button%d\n", buttonIn);
 	return true;
 }
 
@@ -216,7 +201,7 @@ bool Input::setupSerial() {
 }
 
 void Input::setCV(int index, float val) {
-	// if(index == 4)
+	// if(index == 2)
 	// std::cout << "Setting CV " << index << ": "<< val<< std::endl;
 
 	//~ smoothVal = smooth(val, lastCV[chan-3]);
@@ -226,7 +211,9 @@ void Input::setCV(int index, float val) {
 	//~ inputMutex.unlock();
 	//lastCV[chan-3] = val;
 	//~ }
-
+	if (index > 7 ){ //dont support anyting above 7 for now
+		return;
+	}
 	inputMutex.lock();
 	clock_t readtime = clock();
 	cvIn[index] = val;
@@ -237,41 +224,10 @@ void Input::setCV(int index, float val) {
 	lastCVRead[index] = (float) readtime / (CLOCKS_PER_SEC);
 }
 
-void Input::set3PosSwitch(int index, int pin1, int pin2){
-
-	int r1 = digitalRead(pin1);
-	int r2 = digitalRead(pin2);
-
-	// 0 is off (center) 1 is up 2 is down
-	int switchPos = 0;
-	if(r1){
-		switchPos = 1;
-	}
-	if (r2){
-		switchPos = 2;
-	}
-
-	inputMutex.lock();
-	switches[index] = switchPos;
-	inputMutex.unlock();
-
-	// if(index == 1)
-	// std::cout << "Setting Switch " << index << " " << r1 <<"&" << r2 << ": "<< switches[index]<< std::endl;
-
-}
-
 float Input::getCV(int i) {
 	float ret;
 	Input::inputMutex.lock();
 	ret = cvIn[i];
-	Input::inputMutex.unlock();
-	return ret;
-}
-
-int Input::getSwitch(int i){
-	float ret;
-	Input::inputMutex.lock();
-	ret = switches[i];
 	Input::inputMutex.unlock();
 	return ret;
 }
@@ -302,6 +258,10 @@ int Input::smooth(int in, int PrevVal) {
 	return -1;
 }
 
-//==============================================================================
+int Input::getSwitch(int index){
+	if(index < SWITCH_COUNT){
+		return switches[index];
+	}
+}
 
 #endif

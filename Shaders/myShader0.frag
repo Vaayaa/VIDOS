@@ -523,19 +523,19 @@ void fbBased(){
 	float scale = 1. ;
 	position = position * scale;
 
-	float syncDrift = 0.1 ;
-	float scan0 = getScan(position, 0. , 0.);
-	float f1 = cv0 * 10.;
+	float syncDrift = .1 ;
+	float scan0 = getScan(position, cv3 * TWO_PI , 0.);
+	float f1 = cv0 * 8.;
 
 	float osc1 = osc(scan0, f1, 0., syncDrift );
 
 	vec3 color = vec3(0.) + osc1;
 
-	vec2 fbPos = toPolar(position + (osc1 * cv1) ) ;
+	vec2 fbPos = toPolar(position ) ;
 	//Feedback
-	vec3 fbColor = texture2D( texFB, fbPos ).xyz * .1 * 2.;
+	vec3 fbColor = texture2D( texFB, fbPos ).xyz;
 
-	color += fbColor; 
+	// color += fbColor * 0.; 
 	gl_FragColor = vec4( color, 1.0 );
 }
 
