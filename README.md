@@ -25,6 +25,9 @@ The device comes with 3 bipolar CV inputs that can be used to control each of th
 
 Pair VidBoi with an external LFO for slow morphing changes or patch in your modular sequencer for rhythmic frames in sync with the rest of your patch.
 
+## OSC Control
+Do you have one of those addicting pocket thingies?! Make it send packets with an app like TouchOSC or Lemur and control that shader! Send stuff to /vidos/0 ... 7 to control those CVs in the .frag
+
 ## Write Your Own Shaders
 
 VidBoi is basically just a Raspberry Pi in a convenient package that is ready to be programmed. Just plug in your keyboard to edit your own shader code. (Detailed info coming soon)
@@ -39,7 +42,9 @@ When you're ready to take the show on the road and/or open your creations up to 
 ## Software
 0. flash rasbian
 8. git clone https://github.com/teafella/VidBoi
-59. sudo apt-get install libsoil-dev
+59. sudo apt-get install libsoil-dev libasound2-dev
+
+### Optional (You probably already have this in default rasbian)
 5. install wiringPI: http://wiringpi.com/download-and-install/
 
 

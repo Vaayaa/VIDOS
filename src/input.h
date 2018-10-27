@@ -27,8 +27,7 @@ public:
 
 private:
 	//options
-	bool useSerial = false;
-
+	bool useOSC = true;
 
 	int serialFd;
 	float cvIn[CV_COUNT] = {0};
@@ -39,8 +38,12 @@ private:
 
 	std::function<void(bool)> onButton;
 
+	bool setupOSC();
+	bool readOSC();
+
 	bool setupSerial();
 	bool readSerial();
+
 	bool setupADC();
 	bool readADC();
 	static int smooth(int in, int PrevVal);

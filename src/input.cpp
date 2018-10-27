@@ -14,17 +14,23 @@
 #define SPI_CHAN 0
 #include <wiringPi.h>
 #include "mcp3004.h"
+#include "oscListener.h"
 
 
 Input::Input() {
 	onButton = 0;
-	if (useSerial) {
+	//go through input possibilities
+	//try to use serial
+	if(setupSerial()){
 		std::cout << "Using Serial (Arduino) for Input." << std::endl;
-		setupSerial();
 	}
-	else {
+	//try to use Hardware ADC
+	else if(!useOSC && setupADC()){
 		std::cout << "Using MCP3008 for Input." << std::endl;
-		setupADC();
+	}
+	//setup OSC control
+	else{
+		setupOSC();
 	}
 }
 
@@ -43,6 +49,23 @@ void Input::addButtonCallback(std::function<void(bool)> buttonCallback) {
 	onButton = buttonCallback;
 }
 
+bool Input::setupOSC(){
+    threadRunning = true;
+    inputThread = std::thread(&Input::readOSC, this);
+    std::cout << "Using OSC." << std::endl;
+    return true;
+}
+
+bool Input::readOSC(){
+	MyPacketListener listener(this);
+    UdpListeningReceiveSocket s(
+            IpEndpointName( IpEndpointName::ANY_ADDRESS, PORT ),
+            &listener );
+    std::cout << "listening for input on port " << PORT << "...\n";
+    s.Run();
+    return true;
+}
+
 bool Input::setupADC() {
 	//initialize wiringPi
 	if (wiringPiSetup() == -1)
@@ -50,11 +73,13 @@ bool Input::setupADC() {
 		std::cout << "Input Error: WiringPi setup failure" << std::endl;
 		return false;
 	}
-	mcp3004Setup(BASE, SPI_CHAN);
-	//start input thread
-	threadRunning = true;
-	inputThread = std::thread(&Input::readADC, this);
-	return true;
+	if(mcp3004Setup(BASE, SPI_CHAN)){
+		//start input thread
+		threadRunning = true;
+		inputThread = std::thread(&Input::readADC, this);
+		return true;
+	}
+	return false;
 }
 
 bool Input::readADC() {
@@ -192,9 +217,9 @@ void Input::setCV(int index, float val) {
 	cvIn[index] = val;
 	lastCV[index].push_back(val);
 	lastCV[index].erase(lastCV[index].begin());
+	inputMutex.unlock();
 	//save time when the read was performed
 	lastCVRead[index] = (float) readtime / (CLOCKS_PER_SEC);
-	inputMutex.unlock();
 }
 
 float Input::getCV(int i) {

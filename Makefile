@@ -14,7 +14,7 @@ INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/v
 INCLUDES+= -Isrc 
 
 
-LDLIBS+= -lSOIL -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -lm -lwiringPi -lm -lasound $(wildcard lib/*.a)
+LDLIBS+= -lSOIL -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -lm -lwiringPi -lm -lasound $(wildcard lib/*.a) $(wildcard lib/*.so)
 
 .PHONY: all clean
 
