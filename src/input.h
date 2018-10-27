@@ -22,6 +22,7 @@ public:
 	
 	std::vector<float> getCVList(int index);
 	float getCV(int index);
+	void setCV (int index, float val);
 	int getSwitch(int index);
 
 
@@ -38,11 +39,10 @@ private:
 	float lastCVRead[CV_COUNT] = {0.};
 	int lastSmoothCV[CV_COUNT] = {0};
 	int buttonIn = 0;
-
 	//3pos Switches
 	int switches[SWITCH_COUNT] = {0};
 
-	void setCV (int index, float val);
+	
 	void set3PosSwitch(int index, int pin1, int pin2);
 
 	std::function<void(bool)> onButton;
@@ -52,7 +52,7 @@ private:
 
 	bool setupSerial();
 	bool readSerial();
-	
+
 	bool readSwitches();
 
 	bool setupADC();
