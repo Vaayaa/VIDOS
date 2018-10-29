@@ -23,6 +23,7 @@ uniform int sceneIndex;
 
 uniform sampler2D texFB;
 uniform sampler2D texCV;
+uniform sampler2D tex;
 // uniform sampler2D texIN;
 
 varying vec4 outColor;
@@ -492,29 +493,32 @@ void datBoiTest(){
 	float scale = 1. ;
 	position = position * scale;
 
-	vec3 rot = mux(0.);
+	vec3 rot ;//= mux(0.);
 	rot[0] = cv3 * TWO_PI;
-	rot[1] = cv4 * TWO_PI;
-	rot[2] = cv5 * TWO_PI;
+	rot[1] = cv5 * TWO_PI;
+	// rot[2] = cv4 * TWO_PI;
 	
 	float scan0 = getScan(position, rot[0], 0.);
-
 	
 	float syncDrift = .1 ;
 	
 	//vec3 freq = mux(cv0);
 	float f1 = cv0 * 20.;
-	float f2 = cv1 * 20.;
-	float f3 = cv2 * 20.;
+	float f2 = cv2 * 20.;
+	// float f3 = cv2 * 20.;
 
 	
 	float osc1, osc2, osc3;
 	
 	osc1 = osc(0,scan0, f1, 0., syncDrift ) * 1. ;
-	float scan1 = getScan(position, rot[1], 0.) + osc1 ;
+	float scan1 = getScan(position, rot[1], cv1) ;
+	if( sw1 == 1){
+		scan1 += osc1;
+	}
 	osc2 = osc(0,scan1, f2, 0., syncDrift ) * 1.;
-	float scan2 = getScan(position , rot[2] , 0.);
-	osc3 = osc(0,scan2, f3 , 0., syncDrift ) * 1.;
+	// float scan2 = getScan(position , rot[2] , 0.);
+	// osc3 = osc(0,scan2, f3 , 0., syncDrift ) * 1.;
+
 
 	
 	vec3 hue = pallete( cv6 * .6666 );
@@ -522,24 +526,24 @@ void datBoiTest(){
 	float shape = 0.;
 	//osc 1 0: min/max 1: +/- 2: * //
 
-	//osc1 = max(max(osc2 , osc1), osc3 ) * cv2split[0] + min(min(osc2 , osc1), osc3) * cv2split[1];
+	// osc1 = max(max(osc2 , osc1), osc3 ) * cv2split[0] + min(min(osc2 , osc1), osc3) * cv2split[1];
 	//osc1 = ( osc2 + osc1 + osc3 ) * cv2split[0] + ( osc2 - osc1 - osc3 ) * cv2split[1];
 	//osc1 = ( osc2 * osc1 * osc3 ) * cv2split[0] + ( osc1/ osc2 / osc3 ) * cv2split[1];
 
 
 	vec3 oscA = colorizer(osc1, hue[0],   1. ) * 1.;
-	vec3 oscB = colorizer(osc2, hue[1] + osc2 ,  1. ) * 1.;
-	vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
+	vec3 oscB = colorizer(osc2, hue[1],  1. ) * 1.;
+	// vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
 
 	
 	//Feedback
-	vec3 fbColor = texture2D( texFB, position ).xyz * cv7;
+	vec3 fbColor = texture2D( tex, position + osc2  ).xyz * (cv7 *10.);
 
 	//Mixer
 	vec3 color = vec3(0.);
-	color = mixMode(color, oscA, cv0 , 0) ;
-	color = mixMode(color, oscB, cv1 , 0) ;
-	color = mixMode(color, oscC, cv2 , 0) ;
+	color = mixMode(color, oscA, 1. , 0) ;
+	color = mixMode(color, oscB, 1. , 0) ;
+	// color = mixMode(color, oscC, cv2 , 0) ;
 	// color = oscA + oscB + ;
 	color /= fbColor; 
 	gl_FragColor = vec4( color, 1.0 );
@@ -551,8 +555,8 @@ void fbBased(){
  	vec2 position = tcoord;
 	
 	float scale = 10. ;
-	vec2 positionCartesian = position * scale;
-	position = toPolar(positionCartesian), positionCartesian, random(positionCartesian);
+	vec2 positionCartesian = position ;
+	position = toPolar(positionCartesian);//, positionCartesian, random(positionCartesian);
 	// position = vec2( position.x, log(position.y) );
 
 	float syncDrift = 0. ;
@@ -567,11 +571,11 @@ void fbBased(){
 
 	vec3 color = vec3(0.) + osc1;
 
-	vec2 fbPosR = positionCartesian  ;
+	vec2 fbPosR = positionCartesian ;
 	// vec2 fbPosG = positionCartesian + 0.00001;
 	// vec2 fbPosB = positionCartesian - 0.00001;
 	//Feedback
-	vec3 fbColor = texture2D( texFB, fbPosR ).xyz;
+	vec3 fbColor = texture2D( tex, fbPosR ).xyz;
 	// fbColor.g = texture2D( texFB, fbPosG ).y;
 	// fbColor.b = texture2D( texFB, fbPosB ).z;
 

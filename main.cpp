@@ -95,7 +95,7 @@ typedef struct
   unsigned char* inputImageTexBuf;
   int buf_height, buf_width;
 // my shader attribs
-  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw0, unif_sw1, unif_sw2;
+  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texFB, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw0, unif_sw1, unif_sw2;
   GLuint unif_inputVal, unif_sceneIndex;
 
   GLuint unif_time;
@@ -361,7 +361,7 @@ static void init_shaders( bool firstrun = true)
   state->unif_offset = glGetUniformLocation(state->program, "offset");
   state->unif_tex    = glGetUniformLocation(state->program, "tex");
   state->unif_texCV    = glGetUniformLocation(state->program, "texCV");
-  state->unif_texIN    = glGetUniformLocation(state->program, "texFB");
+  state->unif_texFB    = glGetUniformLocation(state->program, "texFB");
   state->unif_resolution   = glGetUniformLocation(state->program, "resolution");
   state->unif_centre = glGetUniformLocation(state->program, "centre");
   state->unif_time = glGetUniformLocation(state->program, "time");
@@ -432,15 +432,18 @@ static void init_shaders( bool firstrun = true)
   // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
   // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
   // check();
-  //changed to feedback texture
-  glActiveTexture(GL_TEXTURE0 + 2);
-  glBindTexture(GL_TEXTURE_2D, state->tex[2]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 2, 0,
-               GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
-  check();
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
-  check();
+  
+  //changed to feedback texture (doesnt work...)
+  // glActiveTexture(GL_TEXTURE0 + 2);
+  // glBindTexture(GL_TEXTURE_2D, state->tex[2]);
+  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 2, 0,
+  //              GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
+  // check();
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  // check();
 
 
 
@@ -609,7 +612,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
   glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?
   glUniform1i(state->unif_texCV, 1);
-  glUniform1i(state->unif_texIN, 2);
+  glUniform1i(state->unif_texFB, 2);
 
   //pass time into the frag shader
   clock_t end = clock();
