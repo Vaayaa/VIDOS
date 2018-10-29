@@ -13,9 +13,9 @@ uniform float cv5;
 uniform float cv6;
 uniform float cv7;
 
+uniform int sw0;
 uniform int sw1;
 uniform int sw2;
-uniform int sw3;
 
 varying vec2 tcoord;
 uniform float time;
@@ -23,7 +23,7 @@ uniform int sceneIndex;
 
 uniform sampler2D texFB;
 uniform sampler2D texCV;
-uniform sampler2D texIN;
+// uniform sampler2D texIN;
 
 varying vec4 outColor;
 
@@ -37,14 +37,43 @@ float random (float x) {
     return fract(sin(x)*1e4);
 }
 
-highp float random(vec2 co)
-{
-    highp float a = 12.9898;
-    highp float b = 78.233;
-    highp float c = 43758.5453;
-    highp float dt= dot(co.xy ,vec2(a,b));
-    highp float sn= mod(dt,3.14);
-    return fract(sin(sn) * c);
+float random (in vec2 st) {
+    return fract(sin(dot(st.xy,
+                         vec2(12.9898,78.233)))*
+        43758.5453123);
+}
+
+float noise (in vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+
+    // Four corners in 2D of a tile
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return mix(a, b, u.x) +
+            (c - a)* u.y * (1.0 - u.x) +
+            (d - b) * u.x * u.y;
+}
+
+#define OCTAVES 2
+float fbm (in vec2 st) {
+    // Initial values
+    float value = 0.0;
+    float amplitude = .5;
+    float frequency = 0.;
+    //
+    // Loop of octaves
+    for (int i = 0; i < OCTAVES; i++) {
+        value += amplitude * noise(st);
+        st *= 2.;
+        amplitude *= .5;
+    }
+    return value;
 }
 
 
@@ -211,7 +240,7 @@ vec3 drawImage(vec2 st, vec2 position, float scale){
 		//~ return vec3(0,0,0);
 	//~ }
 	
-	vec3 color = texture2D( texIN, texSt).xyz;
+	vec3 color = vec3(0.0);//texture2D( texIN, texSt).xyz;
 	
 	if(color == vec3(1.,1.,1.)){
 		return vec3(0.);
@@ -373,8 +402,16 @@ void datBoiFrag(){
 	
 }
 
-float osc(float scan, float frequency, float phase, float drift){
-	return  (sin(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+float osc(int shape, float scan, float frequency, float phase, float drift){
+	if(shape == 0){
+		return  (sin(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+	}
+	else if (shape == 1){
+		return  (cos(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+	}
+	else{
+		return  0.0;
+	}
 }
 float getScan(vec2 position, float rotation, float polar){
 	position = rotate2D(position, rotation);
@@ -456,34 +493,31 @@ void datBoiTest(){
 	position = position * scale;
 
 	vec3 rot = mux(0.);
-	// rot[0] = cv0 * TWO_PI;
-	// rot[1] = cv1 * TWO_PI;
-	// rot[2] = cv2 * TWO_PI;
+	rot[0] = cv3 * TWO_PI;
+	rot[1] = cv4 * TWO_PI;
+	rot[2] = cv5 * TWO_PI;
 	
-	float scan0 = getScan(position, rot[0] * PI, 0.);
+	float scan0 = getScan(position, rot[0], 0.);
 
 	
 	float syncDrift = .1 ;
-	if(sw1 == 2){
-		syncDrift = 0.;
-	}
 	
 	//vec3 freq = mux(cv0);
-	float f1 = cv0 * 50.;
-	float f2 = cv1 * 50.;
-	float f3 = cv2 * 50.;
+	float f1 = cv0 * 20.;
+	float f2 = cv1 * 20.;
+	float f3 = cv2 * 20.;
 
 	
 	float osc1, osc2, osc3;
 	
-	osc1 = osc(scan0, f1, 0., syncDrift ) * 1. ;
-	float scan1 = getScan(position, rot[1] * PI, 0.) + osc1 ;
-	osc2 = osc(scan1, f2, 0., syncDrift ) * 1.;
-	float scan2 = getScan(position , rot[2] * PI , 0.);
-	osc3 = osc(scan2, f3 , 0., syncDrift ) * 1.;
+	osc1 = osc(0,scan0, f1, 0., syncDrift ) * 1. ;
+	float scan1 = getScan(position, rot[1], 0.) + osc1 ;
+	osc2 = osc(0,scan1, f2, 0., syncDrift ) * 1.;
+	float scan2 = getScan(position , rot[2] , 0.);
+	osc3 = osc(0,scan2, f3 , 0., syncDrift ) * 1.;
 
 	
-	vec3 hue = pallete( 0.12 * .6666 );
+	vec3 hue = pallete( cv6 * .6666 );
 	
 	float shape = 0.;
 	//osc 1 0: min/max 1: +/- 2: * //
@@ -499,7 +533,7 @@ void datBoiTest(){
 
 	
 	//Feedback
-	vec3 fbColor = texture2D( texFB, position ).xyz * .1 * 2.;
+	vec3 fbColor = texture2D( texFB, position ).xyz * cv7;
 
 	//Mixer
 	vec3 color = vec3(0.);
@@ -507,40 +541,46 @@ void datBoiTest(){
 	color = mixMode(color, oscB, cv1 , 0) ;
 	color = mixMode(color, oscC, cv2 , 0) ;
 	// color = oscA + oscB + ;
-	color += fbColor; 
-
-	//color = vec3(cv3);
+	color /= fbColor; 
+	gl_FragColor = vec4( color, 1.0 );
 
 	
 }
 
 void fbBased(){
-	vec2 texPos = tcoord;
-	vec3 texColor = texture2D( texCV, texPos ).xyz;
-
  	vec2 position = tcoord;
 	
-	float scale = 1. ;
-	position = position * scale;
+	float scale = 10. ;
+	vec2 positionCartesian = position * scale;
+	position = toPolar(positionCartesian), positionCartesian, random(positionCartesian);
+	// position = vec2( position.x, log(position.y) );
 
-	float syncDrift = .1 ;
-	float scan0 = getScan(position, cv3 * TWO_PI , 0.);
-	float f1 = cv0 * 8.;
+	float syncDrift = 0. ;
 
-	float osc1 = osc(scan0, f1, 0., syncDrift );
+	float f2 = cv1 * 2.;
+
+	float scan0 = getScan(positionCartesian, cv3 * TWO_PI   , 0.);
+
+	float f1 = cv0 * 10.;
+
+	float osc1 = osc(0, scan0, f1, 0., syncDrift );
 
 	vec3 color = vec3(0.) + osc1;
 
-	vec2 fbPos = toPolar(position ) ;
+	vec2 fbPosR = positionCartesian  ;
+	// vec2 fbPosG = positionCartesian + 0.00001;
+	// vec2 fbPosB = positionCartesian - 0.00001;
 	//Feedback
-	vec3 fbColor = texture2D( texFB, fbPos ).xyz;
+	vec3 fbColor = texture2D( texFB, fbPosR ).xyz;
+	// fbColor.g = texture2D( texFB, fbPosG ).y;
+	// fbColor.b = texture2D( texFB, fbPosB ).z;
 
-	// color += fbColor * 0.; 
+	color += fbColor * (cv7  ); 
 	gl_FragColor = vec4( color, 1.0 );
 }
 
 void main( void ) {
-	//datBoiFrag();
-	fbBased();
+	datBoiTest();
+	// fbBased();
 
 }

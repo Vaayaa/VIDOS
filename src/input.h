@@ -42,9 +42,6 @@ private:
 	//3pos Switches
 	int switches[SWITCH_COUNT] = {0};
 
-	
-	void set3PosSwitch(int index, int pin1, int pin2);
-
 	std::function<void(bool)> onButton;
 
 	bool setupOSC();
@@ -54,6 +51,8 @@ private:
 	bool readSerial();
 
 	bool readSwitches();
+	void set3PosSwitch(int index, int pin1, int pin2);
+	void setSwitch(int index, int switchPos);
 
 	bool setupADC();
 	bool readADC();

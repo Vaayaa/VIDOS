@@ -212,6 +212,10 @@ void Input::setCV(int index, float val) {
 	//lastCV[chan-3] = val;
 	//~ }
 	if (index > 7 ){ //dont support anyting above 7 for now
+
+		if(index >= 100){ //this is a switch (probably rewrite this with a map :/ )
+			setSwitch(index - 100, (int)val );
+		}
 		return;
 	}
 	inputMutex.lock();
@@ -258,10 +262,48 @@ int Input::smooth(int in, int PrevVal) {
 	return -1;
 }
 
-int Input::getSwitch(int index){
-	if(index < SWITCH_COUNT){
-		return switches[index];
+int Input::getSwitch(int i){
+	float ret = 0.0;
+	if(i < SWITCH_COUNT){
+		Input::inputMutex.lock();
+		ret = switches[i];
+		Input::inputMutex.unlock();
 	}
+	return ret;
+}
+
+void Input::setSwitch(int index, int switchPos){
+	// 0 is off (center) 1 is up 2 is down
+	inputMutex.lock();
+	switches[index] = switchPos;
+	// std::cout<<index << ": " << switchPos << std::endl;
+	inputMutex.unlock();
+}
+
+void Input::set3PosSwitch(int index, int pin1, int pin2){
+ 	int r1 = digitalRead(pin1);
+	int r2 = digitalRead(pin2);
+ 	// 0 is off (center) 1 is up 2 is down
+	int switchPos = 0;
+	if(r1){
+		switchPos = 1;
+	}
+	if (r2){
+		switchPos = 2;
+	}
+ 	inputMutex.lock();
+	switches[index] = switchPos;
+	inputMutex.unlock();
+ 	// if(index == 1)
+	// std::cout << "Setting Switch " << index << " " << r1 <<"&" << r2 << ": "<< switches[index]<< std::endl;
+ }
+
+ bool Input::readSwitches(){
+	//read switches
+ 	set3PosSwitch(0, 4, 5);
+	set3PosSwitch(1, 0, 2);
+	set3PosSwitch(2, 22, 23);
+	return true;
 }
 
 #endif

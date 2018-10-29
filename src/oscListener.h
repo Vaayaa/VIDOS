@@ -63,13 +63,27 @@ public:
             // std::cout << "Data Type: " << type << std::endl;
         }
         if(getline(issVal, val, ':')){
-            // std::cout << "Data Val: " << val std::endl;
+            // std::cout << "Data Val: " << val << std::endl;
         }
+
 
         //time to output things back to our synth
         if(addressArray[1].compare("vidos") == 0){ //make sure this is a vidos message
             if(type.compare("float32") == 0){ // only support float32s for now
-                inputPtr->setCV(stoi(addressArray[2]), stof(val));
+
+                int address = -1;
+                try {
+                  address = stoi(addressArray[2]);
+                }
+                catch(...){
+                  // if no conversion could be performed
+                }
+
+                if(address != -1){
+                    inputPtr->setCV(address, stof(val));
+                }
+
+                
             }
         }
 

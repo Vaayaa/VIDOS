@@ -70,9 +70,9 @@ typedef struct
   GLfloat inputCV6 = 0.0;
   GLfloat inputCV7 = 0.0;
 
+  GLint switch0 = 0;
   GLint switch1 = 0;
   GLint switch2 = 0;
-  GLint switch3 = 0;
 
   GLfloat inputFFT[4] = {0.0, 0.0, 0.0, 0.0};
   GLuint vshader;
@@ -95,7 +95,7 @@ typedef struct
   unsigned char* inputImageTexBuf;
   int buf_height, buf_width;
 // my shader attribs
-  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw1, unif_sw2, unif_sw3;
+  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texIN, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw0, unif_sw1, unif_sw2;
   GLuint unif_inputVal, unif_sceneIndex;
 
   GLuint unif_time;
@@ -359,9 +359,9 @@ static void init_shaders( bool firstrun = true)
   state->unif_color  = glGetUniformLocation(state->program, "color");
   state->unif_scale  = glGetUniformLocation(state->program, "scale");
   state->unif_offset = glGetUniformLocation(state->program, "offset");
-  state->unif_tex    = glGetUniformLocation(state->program, "texFB");
+  state->unif_tex    = glGetUniformLocation(state->program, "tex");
   state->unif_texCV    = glGetUniformLocation(state->program, "texCV");
-  state->unif_texIN    = glGetUniformLocation(state->program, "texIN");
+  state->unif_texIN    = glGetUniformLocation(state->program, "texFB");
   state->unif_resolution   = glGetUniformLocation(state->program, "resolution");
   state->unif_centre = glGetUniformLocation(state->program, "centre");
   state->unif_time = glGetUniformLocation(state->program, "time");
@@ -378,9 +378,9 @@ static void init_shaders( bool firstrun = true)
   state->unif_fft = glGetUniformLocation(state->program, "fft");
 
   //switches
+  state->unif_sw0 = glGetUniformLocation(state->program, "sw0");
   state->unif_sw1 = glGetUniformLocation(state->program, "sw1");
   state->unif_sw2 = glGetUniformLocation(state->program, "sw2");
-  state->unif_sw3 = glGetUniformLocation(state->program, "sw3");
 
 
 
@@ -404,7 +404,9 @@ static void init_shaders( bool firstrun = true)
   check();
 
   //usually has "/ CONTEXT_DIV " this isnt working in some cases for some reason
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width  , state->screen_height , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  //try to set SD here: 640×480
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width  , state->screen_height , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640, 480 , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
   check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -422,14 +424,24 @@ static void init_shaders( bool firstrun = true)
   check();
 
   //bind input tex
-  load_tex_images(state);
+  // load_tex_images(state);
+  // glActiveTexture(GL_TEXTURE0 + 2);
+  // glBindTexture(GL_TEXTURE_2D, state->tex[2]);
+  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
+  //              GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  // check();
+  //changed to feedback texture
   glActiveTexture(GL_TEXTURE0 + 2);
   glBindTexture(GL_TEXTURE_2D, state->tex[2]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
-               GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 3 , 2, 0,
+               GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
+  check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
   check();
+
 
 
   // Prepare a framebuffer for rendering
@@ -451,6 +463,7 @@ static void init_shaders( bool firstrun = true)
   // check();
   // Prepare viewport
   glViewport ( 0, 0, state->screen_width, state->screen_height );
+
   check();
 
   // Upload vertex data to a buffer
@@ -486,7 +499,7 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glUniform4f(state->unif_color, 0.5, 0.5, 0.8, 1.0);
   glUniform2f(state->unif_scale, scale, scale);
   glUniform2f(state->unif_centre, cx, cy);
-  glUniform2f( state->unif_resolution, state->screen_width, state->screen_height);
+  glUniform2f( state->unif_resolution, 640, 480);
   glUniform2f(state->unif_inputVal, state->inputValX, state->inputValY);
   //pass sceneIndex into shader
   glUniform1i( state->unif_sceneIndex, state->sceneIndex);
@@ -505,9 +518,9 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 
 
   //pass switches into shader
-  state->switch1 =  inputs->getSwitch(0);
-  state->switch2 =  inputs->getSwitch(1);
-  state->switch3 =  inputs->getSwitch(2);
+  state->switch0 =  inputs->getSwitch(0);
+  state->switch1 =  inputs->getSwitch(1);
+  state->switch2 =  inputs->getSwitch(2);
 
   //OLD VER ( CV LIST ONLY )
   //get sqrt of the list size to find out a dimension of the square texture
@@ -572,6 +585,15 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
   check();
 
+  glBindTexture(GL_TEXTURE_2D, state->tex[2]);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640   , 480  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  
+  glReadPixels(0,0, state->screen_width, state->screen_height, GL_RGB, GL_UNSIGNED_BYTE, state->pixels);
+  check();
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  check();
+
   glUniform1f(state->unif_cv0, state->inputCV0);
   glUniform1f(state->unif_cv1, state->inputCV1);
   glUniform1f(state->unif_cv2, state->inputCV2);
@@ -580,6 +602,11 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glUniform1f(state->unif_cv5, state->inputCV5);
   glUniform1f(state->unif_cv6, state->inputCV6);
   glUniform1f(state->unif_cv7, state->inputCV7);
+  //switches
+  glUniform1i(state->unif_sw0, state->switch0);
+  glUniform1i(state->unif_sw1, state->switch1);
+  glUniform1i(state->unif_sw2, state->switch2);
+
   glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?
   glUniform1i(state->unif_texCV, 1);
   glUniform1i(state->unif_texIN, 2);
@@ -621,16 +648,13 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glFinish();
   check();
 
-   //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width   , state->screen_height  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
-  
-  glReadPixels(0,0, state->screen_width, state->screen_height, GL_RGB, GL_UNSIGNED_BYTE, state->pixels);
 
   // for( int x = 0 ; x < 6; ++x){
   //   std::cout << (int)state->pixels[x] << " " ;
   // }
   // std::cout <<std::endl;
 
-  check();
+  // check();
 
 
   eglSwapBuffers(state->display, state->surface);
