@@ -21,10 +21,9 @@ varying vec2 tcoord;
 uniform float time;
 uniform int sceneIndex;
 
-uniform sampler2D texFB;
+uniform sampler2D texIN;
 uniform sampler2D texCV;
-uniform sampler2D tex;
-// uniform sampler2D texIN;
+uniform sampler2D texFB;
 
 varying vec4 outColor;
 
@@ -169,122 +168,30 @@ vec3 hexagon(vec2 st, vec2 position, float scale, float rotation, vec3 color ){
 	return polygon(st, position, scale, rotation,  TWO_PI/6., color);
 }
 
-void etchMain(){
-	vec3 center = vec3(cv0 /0.5 ,cv1/0.5, cv2/0.5);
-	vec2 pos = vec2(tcoord.x, tcoord.y)   ;
-
-	
-	float offset = 0.5 ;
-	vec2 size = vec2(cv1 +.01 , cv2 +.01) / cv0;
-	
-	vec3 linecolor = vec3(0.5, cv1, cv2) ;
-	
-	vec3 texColor = texture2D( texFB, vec2(pos.x*2., pos.y*2.) ).xyz;
-	
-	vec3 color = vec3(horizontalLine(pos, cv0, 0.05  , linecolor)  + verticalLine( pos, 0., 0.05 , linecolor));
-	
-	//TODO: feedback needs to be fixed (currently only feeding back a fraction of the resulting buffer when dividing rendering context)
-	if (texColor.x > 0.8 || texColor.y >.8 || texColor.z > .8){
-		if(cv2 > 0.01){
-			color = color + texColor * (0.87 + cv2 * 0.10);
-		}
-	}
-
-	//~ vec3 color = vec3(box(pos , size, .0) + center)  - vec3( circle(pos , cv0 ) ) ;
-
-	
-	gl_FragColor = vec4( color, 1.0 );
-}
-
-void geometricMain(){
-
-	vec2 st = vec2(tcoord.x, tcoord.y);
-	
-	//exp
-	st = st *2.-1.;
 
 
-  // Angle and radius from the current pixel
-	float ang = atan(st.x,st.y) + PI  ;
-	float rad = sqrt(dot(st,st));
-  
-	ang = cos(ang) + (tcoord.x * (cv2-0.5) * 2.);
-	rad = rad * sin(cv1 * PI/2. );
-	
-	st = fract(vec2(0.1/rad, ang/PI) * (10. * cv0));
-
-	//end exp
-	//~ vec2 ipos = floor(st);
-	//~ vec2 cpos = vec2( floor(tileN/2.) );
-	//~ vec2 toCenterCPos = ipos - cpos; // vector ( in cell space) to the center cell
-	//~ float dCtrPos= distance(ipos, cpos);
-	
-	vec3 color = vec3(0.247058823529, 0.21568627451, 0.18431372549);
-  	
-	//~ st = rotate2D( st, PI * time/2. ) ;
-	//vec3(st, 0);//
-	vec3 colorIn = mix(vec3(0.972549019608 ,0.776470588235,0.349019607843), vec3( 0.9568627451, 0.952941176471, 0.854901960784), cv0)  ;
-	vec3 triColor =triangle(st, vec2(0.0), .2  , cv1 ,  colorIn);
- 	color =  max(triColor, color); //+  texture2D( texIN, st).xyz ;
-
-  	gl_FragColor = vec4(color,1.0);
-}
-
-vec3 drawImage(vec2 st, vec2 position, float scale){
+vec3 drawImage(vec2 st, vec2 position, vec2 scale){
 	
 	st.y = 1. - st.y;
 	st.x -= position.x;
 	st.y += 1.- position.y - 1.;
-	vec2 texSt = (st *scale);
+	vec2 texSt = (st * scale);
 	
 	//~ if(texSt.x > 1. || texSt.x < 0. || texSt.y > 1. || texSt.y < 0.){
 		//~ return vec3(0,0,0);
 	//~ }
 	
-	vec3 color = vec3(0.0);//texture2D( texIN, texSt).xyz;
+	vec3 color = texture2D( texIN, texSt).xyz;
 	
 	if(color == vec3(1.,1.,1.)){
 		return vec3(0.);
 	}
 	
-	color = vec3(color.x * cv0, color.y * cv1, color.z * cv2);
+	color = vec3(color.x , color.y , color.z);
 	
 	
 	
 	return color;
-}
-
-void vaporMain(){
-	vec2 st = vec2(tcoord.x, tcoord.y) * 2. - 1.;
-	//~ st.y += 0.5;
-	float ang = atan(st.x,st.y) + PI ;
-	float rad = sqrt(dot(st,st));
-	
-	//rad += sin(7.85 + ang);
-
-		//vec3(.9725,0.776470588235, 0.835294117647);
-	vec3 color = vec3(sin(time/95.)  , cos(time/82.) , cos(time/90.) );
-	float sometime = sin(time/92.);
-	float sometime2 = sin(time/72.);
-	color += vec3( rad - cv0, rad - cv1, rad - cv2) ;
-	color += vec3(sin(rad) + (-1. * cv0) + log(rad + sometime), 
-	sin(rad - sin(time/52.)) + (-1. * cv1) + log(rad + sometime2) , 
-	sin(rad - + sin(time/32.)) + (-1. * cv2) + log(rad + sin(time/32.)) ) ;
-	//~ color.x += clamp(cos(ang * (100.) - sometime ), 0.4 , .45 - (cv0 *0.5));
-	//~ color.y += clamp(cos(ang * (100.)  + sometime2 ), 0.4, .45 - (cv0 *0.5));
-	//~ color.y += clamp(cos(ang * (100.)  - sometime2 ), 0.4, .45 - (cv0 *0.5));
-	
-
-
-
-	float offset = .1;
-	vec3 imgColor = drawImage(vec2(log(rad) + sometime2, ang ), vec2(ang, ang), .8);
-	//~ if(imgColor != vec3(0,0,0)){
-		//~ color += imgColor;
-	//~ }
-	color += imgColor;
-	
-	gl_FragColor = vec4(color, 1.0);
 }
 
 vec2 toPolar(vec2 st){ // Outputs distance 0 to 1 and Thet
@@ -295,11 +202,6 @@ vec2 toPolar(vec2 st){ // Outputs distance 0 to 1 and Thet
 	float rad = sqrt(dot(st,st)) ;
 
 	st = vec2(ang, rad);
-  
-	// ang = cos(ang) + (tcoord.x * (cv2-0.5) * 2.);
-	// rad = rad * sin(cv1 * PI/2. );
-	
-	// st = fract(vec2(0.1/rad, ang/PI) * (10. * cv0));
 
 	return st; 
 }
@@ -365,7 +267,6 @@ vec3 colorizer( float amplitude,  float color, float saturation ){
 void datBoiFrag(){
 	vec3 texColor = vec3(0.);
 
-	//vec3 center = vec3(cv0 /0.5 ,cv1/0.5, cv2/0.5);
 	vec2 pos = vec2(tcoord.x, tcoord.y) ;
 	vec2 swappedPos = vec2( tcoord.y, tcoord.x);
 
@@ -392,7 +293,7 @@ void datBoiFrag(){
 	
 
 	//Feedback
-	vec3 fbColor = texture2D( texFB, pos ).xyz  * cv2 * 2.;
+	vec3 fbColor = texture2D( texFB, pos  ).xyz  * cv2 * 2.;
 
 
 	//Mixer
@@ -410,8 +311,8 @@ float osc(int shape, float scan, float frequency, float phase, float drift){
 	else if (shape == 1){
 		return  (cos(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
 	}
-	else{
-		return  0.0;
+	else{ 
+		return 0.;
 	}
 }
 float getScan(vec2 position, float rotation, float polar){
@@ -422,6 +323,21 @@ float getScan(vec2 position, float rotation, float polar){
 	polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
 
 	float ret = mix( ((position.x * 100.) + (position.y * 100.) * 100.)/1000., sin(polarPos.y * 8.) , polar);
+	return ret;
+}
+
+vec2 getScanImg(vec2 position, float rotation, float polar){
+	// vec2 polarPos = toPolar(position) ;
+	position = rotate2D(position, rotation);
+	vec2 polarPos = toPolar(position) ;
+	polarPos = vec2( sin(polarPos.x * PI) , polarPos.y  ) ;
+
+	// vec2 polarPos = toPolar(position) ;
+	// vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
+	// polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
+
+	// float ret = mix( ((position.x * 100.) + (position.y * 100.) * 100.)/1000., sin(polarPos.y * 8.) , polar);
+	vec2 ret = mix( position, polarPos, polar);
 	return ret;
 }
 
@@ -485,106 +401,91 @@ float mixMode(float shape, float osc, float cv, int mode){
 
 
 void datBoiTest(){
-	vec2 texPos = tcoord;
-	vec3 texColor = texture2D( texCV, texPos ).xyz;
-
  	vec2 position = tcoord;
 	
-	float scale = 1. ;
+	float scale = 1.;
 	position = position * scale;
 
 	vec3 rot ;//= mux(0.);
 	rot[0] = cv3 * TWO_PI;
 	rot[1] = cv5 * TWO_PI;
 	// rot[2] = cv4 * TWO_PI;
+
+	//SIN OSC
 	
-	float scan0 = getScan(position, rot[0], 0.);
+	float scan0 = getScan(position, rot[0], cv6);
 	
-	float syncDrift = .1 ;
+	float syncDrift = 0.5  ;
 	
-	//vec3 freq = mux(cv0);
 	float f1 = cv0 * 20.;
-	float f2 = cv2 * 20.;
+
+	float f2 = cv2 * 10.;
+
 	// float f3 = cv2 * 20.;
 
 	
+	//WAVETABLE OSC
+
 	float osc1, osc2, osc3;
-	
-	osc1 = osc(0,scan0, f1, 0., syncDrift ) * 1. ;
-	float scan1 = getScan(position, rot[1], cv1) ;
-	if( sw1 == 1){
-		scan1 += osc1;
+	vec2 scan1 = getScanImg(position, rot[1], cv7) ;
+
+	osc1 = osc(0,scan0, f1, 0., syncDrift  ) * 1. ;
+	if( sw0 == 1){
+		scan1 += vec2(osc1);
 	}
-	osc2 = osc(0,scan1, f2, 0., syncDrift ) * 1.;
+	vec3 waveA = drawImage(tcoord + vec2(1., time/10. * syncDrift), scan1 , vec2(f2, 1. )  );
+
+
+
+	// osc2 = osc(0,scan1, f2, 0., syncDrift ) * 1.;
 	// float scan2 = getScan(position , rot[2] , 0.);
 	// osc3 = osc(0,scan2, f3 , 0., syncDrift ) * 1.;
 
 
 	
-	vec3 hue = pallete( cv6 * .6666 );
+	vec3 hue = pallete( cv4 * .6666 );
 	
 	float shape = 0.;
-	//osc 1 0: min/max 1: +/- 2: * //
 
-	// osc1 = max(max(osc2 , osc1), osc3 ) * cv2split[0] + min(min(osc2 , osc1), osc3) * cv2split[1];
-	//osc1 = ( osc2 + osc1 + osc3 ) * cv2split[0] + ( osc2 - osc1 - osc3 ) * cv2split[1];
-	//osc1 = ( osc2 * osc1 * osc3 ) * cv2split[0] + ( osc1/ osc2 / osc3 ) * cv2split[1];
 
 
 	vec3 oscA = colorizer(osc1, hue[0],   1. ) * 1.;
-	vec3 oscB = colorizer(osc2, hue[1],  1. ) * 1.;
-	// vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
-
+	//vec3 oscB = colorizer(osc2, hue[1],  1. ) * 1.;
+	//wavetable osc
 	
-	//Feedback
-	vec3 fbColor = texture2D( tex, position + osc2  ).xyz * (cv7 *10.);
+	// vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
 
 	//Mixer
 	vec3 color = vec3(0.);
-	color = mixMode(color, oscA, 1. , 0) ;
-	color = mixMode(color, oscB, 1. , 0) ;
-	// color = mixMode(color, oscC, cv2 , 0) ;
-	// color = oscA + oscB + ;
-	color /= fbColor; 
-	gl_FragColor = vec4( color, 1.0 );
-
+	if(f1 > 0.){
+		color = mixMode(color, oscA, 1. , 0) ;
+	}
+	if(f2 > 0.){
+		color = mixMode(color, waveA, 1. , 0) ;
+	}
 	
-}
-
-void fbBased(){
- 	vec2 position = tcoord;
-	
-	float scale = 10. ;
-	vec2 positionCartesian = position ;
-	position = toPolar(positionCartesian);//, positionCartesian, random(positionCartesian);
-	// position = vec2( position.x, log(position.y) );
-
-	float syncDrift = 0. ;
-
-	float f2 = cv1 * 2.;
-
-	float scan0 = getScan(positionCartesian, cv3 * TWO_PI   , 0.);
-
-	float f1 = cv0 * 10.;
-
-	float osc1 = osc(0, scan0, f1, 0., syncDrift );
-
-	vec3 color = vec3(0.) + osc1;
-
-	vec2 fbPosR = positionCartesian ;
-	// vec2 fbPosG = positionCartesian + 0.00001;
-	// vec2 fbPosB = positionCartesian - 0.00001;
 	//Feedback
-	vec3 fbColor = texture2D( tex, fbPosR ).xyz;
-	// fbColor.g = texture2D( texFB, fbPosG ).y;
-	// fbColor.b = texture2D( texFB, fbPosB ).z;
+	vec3 fbColor= texture2D( texFB, position ).xyz * (cv1 *10.); 
 
-	color += fbColor * (cv7  ); 
+	if( sw1 == 0){
+		color += (fbColor/8.);
+	}
+	else{
+		color = mod(color, fbColor);
+	}
+	// color = mod(color, fbColor);
+	// color = fract(color);
+	
+	if (sw2 == 1){
+		color = fract(color);
+	}
+
 	gl_FragColor = vec4( color, 1.0 );
+
+	
 }
 
 void main( void ) {
 	datBoiTest();
-	// fbBased();
-
+	// gl_FragColor = vec4(drawImage(tcoord , vec2(0.,0.), vec2(1.)), 1.0);
 }
