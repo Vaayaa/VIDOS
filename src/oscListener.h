@@ -12,11 +12,11 @@ using ::__strcmp__;  // avoid error: E2316 '__strcmp__' is not a member of 'std'
 }
 #endif
 
-#include <oscpack/osc/OscReceivedElements.h>
-#include <oscpack/osc/OscPrintReceivedElements.h>
-#include <oscpack/osc/OscPacketListener.h>
-#include <oscpack/ip/PacketListener.h>
-#include <oscpack/ip/UdpSocket.h>
+#include <lib/oscpack/osc/OscReceivedElements.h>
+#include <lib/oscpack/osc/OscPrintReceivedElements.h>
+#include <lib/oscpack/osc/OscPacketListener.h>
+#include <lib/oscpack/ip/PacketListener.h>
+#include <lib/oscpack/ip/UdpSocket.h>
 
 #include <src/input.h>
 

@@ -26,6 +26,7 @@
 #include "src/input.h"
 #include "src/audio.h"
 #include "src/fileWatcher.h"
+#include "src/Shader.h"
 
 //Global defines
 #include <time.h>
@@ -33,7 +34,7 @@
 #define IMAGE_SIZE 128
 
 #define IN_TEX_NAME "/images/pusheen.png"
-#define CONTEXT_DIV 1000
+#define CONTEXT_DIV 2
 
 clock_t begin = clock();
 
@@ -80,7 +81,7 @@ typedef struct
   GLuint mshader;
   GLuint program;
   GLuint framebuffer;
-  GLuint tex[4];
+  GLuint tex[5];
   GLuint buf;
 
   //create pixel buffer pointer (for passing color into audio engine)
@@ -91,11 +92,10 @@ typedef struct
   std::vector<float> buffer1;
   std::vector<float> buffer2;
 
-  //unsigned char* fb_buf; //feedback disabled
   unsigned char* inputImageTexBuf;
   int buf_height, buf_width;
 // my shader attribs
-  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texFB, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw0, unif_sw1, unif_sw2;
+  GLuint unif_color, attr_vertex, unif_scale, unif_offset, unif_tex, unif_centre, unif_resolution, unif_texCV, unif_texFB, unif_texIN, unif_cv0, unif_cv1, unif_cv2,unif_cv3,unif_cv4,unif_cv5, unif_cv6, unif_cv7, unif_fft, unif_sw0, unif_sw1, unif_sw2;
   GLuint unif_inputVal, unif_sceneIndex;
 
   GLuint unif_time;
@@ -115,12 +115,17 @@ static void checkFramebuffer() {
   }
 }
 
-static void showlog(GLint shader)
+static bool showlog(GLint shader)
 {
   // Prints the compile log for a shader
-  char log[1024];
+  char log[1024] = {0};
   glGetShaderInfoLog(shader, sizeof log, NULL, log);
   printf("\n%d:shader:\n%s\n", shader, log);
+  if(log != 0){
+    return true;
+  }
+  return false;
+
 }
 
 static void showprogramlog(GLint shader)
@@ -214,6 +219,9 @@ static void init_ogl(CUBE_STATE_T *state)
   success = graphics_get_display_size(0 /* LCD */, &state->screen_width, &state->screen_height);
   assert( success >= 0 );
 
+  // state->screen_width = 640;
+  // state->screen_height = 480;
+
   dst_rect.x = 0;
   dst_rect.y = 0;
   dst_rect.width = state->screen_width ;
@@ -221,8 +229,8 @@ static void init_ogl(CUBE_STATE_T *state)
 
   src_rect.x = 0;
   src_rect.y = 0;
-  src_rect.width = state->screen_width << 16;
-  src_rect.height = state->screen_height << 16;
+  src_rect.width = state->screen_width / CONTEXT_DIV << 16;
+  src_rect.height =  state->screen_height / CONTEXT_DIV << 16;
 
   dispman_display = vc_dispmanx_display_open( 0 /* LCD */);
   dispman_update = vc_dispmanx_update_start( 0 );
@@ -230,6 +238,7 @@ static void init_ogl(CUBE_STATE_T *state)
   dispman_element = vc_dispmanx_element_add ( dispman_update, dispman_display,
                     0/*layer*/, &dst_rect, 0/*src*/,
                     &src_rect, DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0/*clamp*/,  (DISPMANX_TRANSFORM_T)0/*transform*/);
+
 
   nativewindow.element = dispman_element;
   nativewindow.width = state->screen_width;
@@ -324,18 +333,20 @@ static void init_shaders( bool firstrun = true)
   state->vshader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(state->vshader, 1, &vshader_source, 0);
   glCompileShader(state->vshader);
-  check();
 
-  if (state->verbose)
-    showlog(state->vshader);
+  if (state->verbose && !showlog(state->fshader)){
+    return;
+  }
+  check();
 
   state->fshader = glCreateShader(GL_FRAGMENT_SHADER);
   glShaderSource(state->fshader, 1, &fshader_source, 0);
   glCompileShader(state->fshader);
   check();
 
-  if (state->verbose)
-    showlog(state->fshader);
+  if (state->verbose && !showlog(state->fshader)){
+    return;
+  }
 
 
   // custom shader attach
@@ -359,7 +370,7 @@ static void init_shaders( bool firstrun = true)
   state->unif_color  = glGetUniformLocation(state->program, "color");
   state->unif_scale  = glGetUniformLocation(state->program, "scale");
   state->unif_offset = glGetUniformLocation(state->program, "offset");
-  state->unif_tex    = glGetUniformLocation(state->program, "tex");
+  state->unif_texIN    = glGetUniformLocation(state->program, "texIN");
   state->unif_texCV    = glGetUniformLocation(state->program, "texCV");
   state->unif_texFB    = glGetUniformLocation(state->program, "texFB");
   state->unif_resolution   = glGetUniformLocation(state->program, "resolution");
@@ -399,14 +410,16 @@ static void init_shaders( bool firstrun = true)
   glActiveTexture(GL_TEXTURE0);
   glGenTextures(3, &state->tex[0]);
   check();
+  checkFramebuffer();
   //setup drawing texture ( bound to main fb later)
   glBindTexture(GL_TEXTURE_2D, state->tex[0]);
   check();
 
-  //usually has "/ CONTEXT_DIV " this isnt working in some cases for some reason
   //try to set SD here: 640×480
   //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width  , state->screen_height , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640, 480 , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  int contextW = 640;
+  int contextH = 480;
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width /CONTEXT_DIV,  state->screen_height /CONTEXT_DIV, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
   check();
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -423,16 +436,16 @@ static void init_shaders( bool firstrun = true)
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
   check();
 
-  //bind input tex
-  // load_tex_images(state);
-  // glActiveTexture(GL_TEXTURE0 + 2);
-  // glBindTexture(GL_TEXTURE_2D, state->tex[2]);
-  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
-  //              GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
-  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
-  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
-  // check();
-  
+  //Unit 2: input tex
+  load_tex_images(state);
+  glActiveTexture(GL_TEXTURE0 + 2);
+  glBindTexture(GL_TEXTURE_2D, state->tex[2]);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->buf_width, state->buf_height, 0,
+               GL_RGB, GL_UNSIGNED_BYTE, state->inputImageTexBuf);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  check();
+
   //changed to feedback texture (doesnt work...)
   // glActiveTexture(GL_TEXTURE0 + 2);
   // glBindTexture(GL_TEXTURE_2D, state->tex[2]);
@@ -462,21 +475,19 @@ static void init_shaders( bool firstrun = true)
   check();
   
   checkFramebuffer();
-  // glBindFramebuffer(GL_FRAMEBUFFER,0);
-  // check();
-  // Prepare viewport
-  glViewport ( 0, 0, state->screen_width, state->screen_height );
+  if(firstrun){
+    // Prepare viewport
+    glViewport ( 0, 0, state->screen_width, state->screen_height );
 
-  check();
-
-  // Upload vertex data to a buffer
-  glBindBuffer(GL_ARRAY_BUFFER, state->buf);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data),
-               vertex_data, GL_STATIC_DRAW);
-  glVertexAttribPointer(state->attr_vertex, 4, GL_FLOAT, 0, 16, 0);
-  glEnableVertexAttribArray(state->attr_vertex);
-  check();
-
+    check();
+  }
+    // Upload vertex data to a buffer
+    glBindBuffer(GL_ARRAY_BUFFER, state->buf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data),
+                 vertex_data, GL_STATIC_DRAW);
+    glVertexAttribPointer(state->attr_vertex, 4, GL_FLOAT, 0, 16, 0);
+    glEnableVertexAttribArray(state->attr_vertex);
+    check();
 }
 
 static void restart_shaders(){
@@ -488,6 +499,8 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
 {
   //render to a texture
   glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
+  //only draw into the smaller divided framebuffer (to make feeedback allign with divided context)
+  glViewport(0,0,state->screen_width/CONTEXT_DIV,state->screen_height/CONTEXT_DIV);
   //glBindFramebuffer(GL_FRAMEBUFFER,state->tex_fb); //ping pong here for framebuffer
   // Clear the background (not really necessary I suppose)
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -510,9 +523,9 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   //UPDATE UNIFORM VALUES
 
   //pass CVs into shader
-  state->inputCV0 = abs( inputs->getCV(0) ); //inputs->getCV(0) +
-  state->inputCV1 = abs(  inputs->getCV(1) ); //inputs->getCV(1) +
-  state->inputCV2 = abs(  inputs->getCV(2) ); // inputs->getCV(2) +
+  state->inputCV0 = abs( inputs->getCV(0) ); 
+  state->inputCV1 = abs(  inputs->getCV(1) ); 
+  state->inputCV2 = abs(  inputs->getCV(2) ); 
   state->inputCV3 = abs(  inputs->getCV(3) );
   state->inputCV4 = abs(  inputs->getCV(4) );
   state->inputCV5 = abs(  inputs->getCV(5) );
@@ -578,24 +591,25 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   //}
   //std::cout<< "reading buffer" <<std::endl;
 
-  glBindTexture(GL_TEXTURE_2D, state->tex[1]);
+  //create new texture and put cv data in it
+  // glBindTexture(GL_TEXTURE_2D, state->tex[1]);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texDim , texDim, 0,
-               GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
+  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texDim , texDim, 0,
+  //              GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &state->inputCVList[0]);
 
-  check();
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
-  check();
-
-  glBindTexture(GL_TEXTURE_2D, state->tex[2]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640   , 480  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  // check();
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  // check();
+  // glActiveTexture(GL_TEXTURE0 + 1);
+  // glBindTexture(GL_TEXTURE_2D, state->tex[1]);
+  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640, 480  , 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
   
-  glReadPixels(0,0, state->screen_width, state->screen_height, GL_RGB, GL_UNSIGNED_BYTE, state->pixels);
-  check();
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
-  check();
+  // glReadPixels(0,0, state->screen_width, state->screen_height, GL_RGB, GL_UNSIGNED_BYTE, state->pixels);
+  // check();
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLfloat)GL_LINEAR);
+  // glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_LINEAR);
+  // check();
 
   glUniform1f(state->unif_cv0, state->inputCV0);
   glUniform1f(state->unif_cv1, state->inputCV1);
@@ -610,9 +624,9 @@ static void draw_triangles(CUBE_STATE_T *state, GLfloat cx, GLfloat cy, GLfloat 
   glUniform1i(state->unif_sw1, state->switch1);
   glUniform1i(state->unif_sw2, state->switch2);
 
-  glUniform1i(state->unif_tex, 0); // I don't really understand this part, perhaps it relates to active texture?
+  glUniform1i(state->unif_texFB, 0); // put texture units into uniform
   glUniform1i(state->unif_texCV, 1);
-  glUniform1i(state->unif_texFB, 2);
+  glUniform1i(state->unif_texIN, 2);
 
   //pass time into the frag shader
   clock_t end = clock();
