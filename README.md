@@ -33,7 +33,7 @@ This shader should start automatically when you run the main.out
 
 VIDOS is basically just a Raspberry Pi in a convenient package that is ready to be programmed.
 
-###OVER WIFI using Sublime Text editor
+### OVER WIFI using Sublime Text editor
 1. Get Sublime here: https://www.sublimetext.com/
 2. Use Sublime's SFTP package: https://wbond.net/sublime_packages/sftp
 3. Follow the directions to edit /VIDOS/MyShader0.frag
