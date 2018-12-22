@@ -31,7 +31,7 @@ public:
 
 private:
 	//options
-	bool useOSC = true;
+	bool useOSC = false;
 
 	int serialFd;
 	float cvIn[CV_COUNT] = {0};

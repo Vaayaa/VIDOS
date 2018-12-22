@@ -54,15 +54,18 @@ Pair VIDOS with an external LFO for slow morphing changes or patch in your modul
 # Installation
 ## Software
 0. flash rasbian
+2. sudo raspi-config and enable wifi, ssh and spi (IMPORTANT)
+3. cd to installation directory (e.g. cd ~/Desktop/)
 8. git clone --recurse-submodules https://github.com/teafella/VIDOS
-59. sudo apt-get install libsoil-dev libasound2-dev
-68. cd VIDOS/
-89. ./main.out
+59. cd VIDOS/
+88. ./install.sh
+
+The above script should run the synth automatically upon completion and sets VIDOS to run automatically on startup
 
 ## Controlling the Shader (OSC SETUP)
 1. Make sure your phone/pi are connected to thesame wifi network
 2. Open A Lemur/TouchOSC layout on your phone
-3. Point Lemur/TouchOSC at the pi (raspberrypi.local @ port 7000)
+3. Point Lemur/TouchOSC at the pi (default is raspberrypi.local @ port 7000)
 
 # OPTIONAL Setup
 ### Optional Installation (You probably already have this in default rasbian)

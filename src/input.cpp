@@ -16,6 +16,10 @@
 #include "mcp3004.h"
 #include "oscListener.h"
 
+#define MUX_ADDRESS_PINA 0
+#define MUX_ADDRESS_PINB 2
+#define MUX_ADDRESS_PINC 3
+
 
 Input::Input() {
 	onButton = 0;
@@ -27,6 +31,15 @@ Input::Input() {
 	//try to use Hardware ADC
 	else if(!useOSC && setupADC()){
 		std::cout << "Using MCP3008 for Input." << std::endl;
+
+		//Setup Muxing pins
+		pinMode (MUX_ADDRESS_PINA, OUTPUT) ;
+		pinMode (MUX_ADDRESS_PINB, OUTPUT) ;
+		pinMode (MUX_ADDRESS_PINC, OUTPUT) ;
+		//Set Pulldowns
+		pullUpDnControl (MUX_ADDRESS_PINA, PUD_DOWN);
+		pullUpDnControl (MUX_ADDRESS_PINB, PUD_DOWN);
+		pullUpDnControl (MUX_ADDRESS_PINC, PUD_DOWN);
 	}
 	//setup OSC control
 	else{
@@ -83,21 +96,46 @@ bool Input::setupADC() {
 }
 
 bool Input::readADC() {
+	//counter for multiplexing ( this should give slightly more priority to sampling CV in theory)
+	int muxCounter = 0;
 	while (threadRunning) {
 		//read mcp3008
 		for ( int chan = 0; chan < 8 ; chan++)
 		{
-			//read in ADC values
-			int val = analogRead( BASE + chan);
-			int smoothVal = smooth(val, lastSmoothCV[chan]);
-			if(smoothVal > -1){
-				lastSmoothCV[chan] = val;
-				setCV(chan, smoothVal / 1024.0);
+			//Read in all the Pots
+			//Channel 0 is Multiplexed with CD4051BE 
+			if( chan  == 0 ){
+				// go through one of the 8 addresses of the mutliplexer via counter
+					// mask out individual bits and set address pins correctly
+				digitalWrite(MUX_ADDRESS_PINA, (bool)(muxCounter&1));
+				digitalWrite(MUX_ADDRESS_PINB, (bool)(muxCounter&2));
+				digitalWrite(MUX_ADDRESS_PINC, (bool)(muxCounter&4));
 
-				//if( chan == 6)
-				//printf("%d: %d lst: %d \n", chan, val, lastSmoothCV[chan]);
+				int val = analogRead( BASE + chan);
+				// if(muxCounter  == 2 ){
+				// 	std::cout<< "muxCounter: "<< muxCounter << " MASKS:" <<  (bool)(muxCounter&1) << " " << (bool)(muxCounter&2) << " " << (bool)(muxCounter&4) << std::endl;
+				// 	std::cout<< "Pot " << muxCounter << " : " << val << std::endl;
+				// }
+
+			}
+
+			else{
+				//read in ADC values
+				int val = analogRead( BASE + chan);
+				int smoothVal = smooth(val, lastSmoothCV[chan]);
+				if(smoothVal > -1){
+					lastSmoothCV[chan] = val;
+					setCV(chan, smoothVal / 1024.0);
+
+					// if( chan == 0)
+					//printf("%d: %d lst: %d \n", chan, val, lastSmoothCV[chan]);
+				}
 			}
 		}
+
+		//advance and reset muxcounter
+		++muxCounter;
+		if(muxCounter > 7) { muxCounter = 0;}
 
 		//read button pin
 		// int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
@@ -115,7 +153,7 @@ bool Input::readADC() {
 		// }
 		//printf("Button%d\n", buttonIn);
 
-		readSwitches();
+		//readSwitches();
 	}
 
 	return true;
