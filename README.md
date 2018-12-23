@@ -55,9 +55,7 @@ Pair VIDOS with an external LFO for slow morphing changes or patch in your modul
 ## Software
 0. flash rasbian
 8. git clone https://github.com/teafella/VIDOS
-59. sudo apt-get install libsoil-dev libasound2-dev
-68. cd VIDOS/
-89. ./main.out
+59. ./install.sh
 
 ## Controlling the Shader (OSC SETUP)
 1. Make sure your phone/pi are connected to thesame wifi network
