@@ -60,12 +60,12 @@ float noise (in vec2 st) {
             (d - b) * u.x * u.y;
 }
 
-#define OCTAVES 2
-float fbm (in vec2 st) {
+#define OCTAVES 1
+float fbm (in vec2 st, float val, float amp , float freq ) {
     // Initial values
-    float value = 0.0;
-    float amplitude = .5;
-    float frequency = 0.;
+    float value = val;
+    float amplitude = amp;
+    float frequency = freq;
     //
     // Loop of octaves
     for (int i = 0; i < OCTAVES; i++) {
@@ -97,7 +97,7 @@ vec3 hsv2rgb(vec3 c)
 }
 
 
-//-------------------------------------------------|
+//--------ROTATION-----------------------------------------|
 
 vec2 rotate2D(vec2 _st, float _angle){
     _st -= 0.5;
@@ -106,6 +106,9 @@ vec2 rotate2D(vec2 _st, float _angle){
     _st += 0.5;
     return _st;
 }
+
+
+//-----------------------------------------|
 
 vec3 box(vec2 _st, vec2 _size, float _smoothEdges){
     _size = vec2(0.5)-_size*0.5;
@@ -201,7 +204,7 @@ vec2 toPolar(vec2 st){ // Outputs distance 0 to 1 and Thet
 	float ang = ( atan(st.y,st.x) + PI ) / TWO_PI; // angle is scaled so you can use this to adress stuff and be more shader like
 	float rad = sqrt(dot(st,st)) ;
 
-	st = vec2(ang, rad);
+	st = vec2(ang, rad );
 
 	return st; 
 }
@@ -264,57 +267,18 @@ vec3 colorizer( float amplitude,  float color, float saturation ){
 	return hsv2rgb( vec3(color, saturation, value) );
 }
 
-void datBoiFrag(){
-	vec3 texColor = vec3(0.);
-
-	vec2 pos = vec2(tcoord.x, tcoord.y) ;
-	vec2 swappedPos = vec2( tcoord.y, tcoord.x);
-
-	//Rotation control for UV in (TODO: rotation per osc)
-	vec2 rotationPos = rotate2D(pos, clamp(cv7*1.2-0.1, 0., 1.) * -TWO_PI);
-
-	vec2 polarPos = toPolar(rotationPos) ;
-	vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
-	polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
-
-	vec2 texPos = mix(rotationPos, polarPos, clamp(cv0*1.1, 0., 1.)  );
-
-	texColor = texture2D( texCV, texPos ).xyz;
-
-
-	//Color Quantization(?) / Palette Selector
-
-	vec3 hue = pallete(cv0 * .6666);
-
-	//OSC
-	vec3 oscA = colorizer(texColor.x, hue[0], 1. );
-	vec3 oscB = colorizer(texColor.y, hue[1],  1.  );
-	vec3 oscC = colorizer(texColor.z, hue[2],  1. );
-	
-
-	//Feedback
-	vec3 fbColor = texture2D( texFB, pos  ).xyz  * cv2 * 2.;
-
-
-	//Mixer
-	vec3 color = (oscA  +  oscB  + oscC ) + fbColor; //TODO: add oscC when hardware is done
-	//--------
-
-	gl_FragColor = vec4( color, 1.0 );
-	
-}
-
-float osc(int shape, float scan, float frequency, float phase, float drift){
+float osc(int shape, vec2 scan, float frequency, float phase, float drift){
 	if(shape == 0){
-		return  (sin(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+		return  (sin(scan.x * frequency + (drift * time) + phase ) + 1.) / 2.;
 	}
 	else if (shape == 1){
-		return  (cos(scan * frequency + (drift * time) + phase ) + 1.) / 2.;
+		return  (cos(scan.x * frequency + (drift * time) + phase ) + 1.) / 2.;
 	}
 	else{ 
-		return 0.;
+		return fbm( (scan * (2.* frequency)) + vec2(drift * time/2.) ,  0.2 , 0.5 , 0.2);
 	}
 }
+
 float getScan(vec2 position, float rotation, float polar){
 	position = rotate2D(position, rotation);
 
@@ -326,18 +290,20 @@ float getScan(vec2 position, float rotation, float polar){
 	return ret;
 }
 
-vec2 getScanImg(vec2 position, float rotation, float polar){
+vec2 getScan2D(vec2 position, float rotation, float polar){
 	// vec2 polarPos = toPolar(position) ;
 	position = rotate2D(position, rotation);
 	vec2 polarPos = toPolar(position) ;
-	polarPos = vec2( sin(polarPos.x * PI) , polarPos.y  ) ;
+	polarPos = vec2( sin(polarPos.x * PI) , polarPos.y  );
+	vec2 wrappedPolar = vec2( polarPos.x , sin(polarPos.y * PI ) );
+	
 
 	// vec2 polarPos = toPolar(position) ;
 	// vec2 swappedPolar = vec2( polarPos.y  , polarPos.x );
 	// polarPos = vec2( sin(polarPos.x * PI ) , polarPos.y  ) ;
 
 	// float ret = mix( ((position.x * 100.) + (position.y * 100.) * 100.)/1000., sin(polarPos.y * 8.) , polar);
-	vec2 ret = mix( position, polarPos, polar);
+	vec2 ret = mix( position, wrappedPolar , polar);
 	return ret;
 }
 
@@ -413,13 +379,13 @@ void datBoiTest(){
 
 	//SIN OSC
 	
-	float scan0 = getScan(position, rot[0], cv6);
+	vec2 scan0 = vec2(getScan(position, rot[0], cv6));
 	
 	float syncDrift = 0.5  ;
 	
 	float f1 = cv0 * 20.;
 
-	float f2 = cv2 * 10.;
+	float f2 = cv2 * 20.;
 
 	// float f3 = cv2 * 20.;
 
@@ -427,19 +393,28 @@ void datBoiTest(){
 	//WAVETABLE OSC
 
 	float osc1, osc2, osc3;
-	vec2 scan1 = getScanImg(position, rot[1], cv7) ;
+	//vec2 scan1 = getScanImg(position, rot[1], cv7) ;
+	vec2 scan1 = getScan2D(position, rot[1], cv7);
+
+
+	osc2 = osc(2, scan1, f2, 0., syncDrift ) * 1.;
+	// float scan2 = getScan(position , rot[2] , 0.);
+	osc3 = osc(2, vec2(osc2) , f2 , 0., syncDrift ) * 1.;
+
+	
+	if( sw2 == 1){
+		//scan1 += vec2(osc1);
+		scan0 += osc3;
+	}
+	//vec3 waveA = drawImage(tcoord + vec2(1., time/10. * syncDrift), scan1 , vec2(f2, 1. )  );
+
+	if (sw0 == 1){
+		
+	}
+
 
 	osc1 = osc(0,scan0, f1, 0., syncDrift  ) * 1. ;
-	if( sw0 == 1){
-		scan1 += vec2(osc1);
-	}
-	vec3 waveA = drawImage(tcoord + vec2(1., time/10. * syncDrift), scan1 , vec2(f2, 1. )  );
-
-
-
-	// osc2 = osc(0,scan1, f2, 0., syncDrift ) * 1.;
-	// float scan2 = getScan(position , rot[2] , 0.);
-	// osc3 = osc(0,scan2, f3 , 0., syncDrift ) * 1.;
+	
 
 
 	
@@ -450,18 +425,22 @@ void datBoiTest(){
 
 
 	vec3 oscA = colorizer(osc1, hue[0],   1. ) * 1.;
-	//vec3 oscB = colorizer(osc2, hue[1],  1. ) * 1.;
+	vec3 oscB = colorizer(osc2, hue[1],  1. ) * 1.;
+	vec3 oscC = colorizer(osc3, hue[2],  1. ) * 1.;
 	//wavetable osc
 	
 	// vec3 oscC = colorizer(osc3, hue[2] ,  1. ) * 1.;
 
 	//Mixer
 	vec3 color = vec3(0.);
-	if(f1 > 0.){
+	if(f1 > 0.05){
 		color = mixMode(color, oscA, 1. , 0) ;
 	}
-	if(f2 > 0.){
-		color = mixMode(color, waveA, 1. , 0) ;
+	if(f2 > 0.05){
+		color = mixMode(color, oscB, 1. , 0) ;
+	}
+	if(f2 > 0.05){
+		color = mixMode(color, oscC, 1. , 0) ;
 	}
 	
 	//Feedback
@@ -476,9 +455,7 @@ void datBoiTest(){
 	// color = mod(color, fbColor);
 	// color = fract(color);
 	
-	if (sw2 == 1){
-		color = fract(color);
-	}
+	
 
 	gl_FragColor = vec4( color, 1.0 );
 
@@ -487,5 +464,5 @@ void datBoiTest(){
 
 void main( void ) {
 	datBoiTest();
-	// gl_FragColor = vec4(drawImage(tcoord , vec2(0.,0.), vec2(1.)), 1.0);
+	//gl_FragColor = vec4(drawImage(tcoord , vec2(0.,0.), vec2(1.)), 1.0);
 }

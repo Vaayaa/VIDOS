@@ -100,20 +100,22 @@ bool Input::readADC() {
 		}
 
 		//read button pin
-		int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
-		bool pressedDown = false;
-		inputMutex.lock();
-		if (val != buttonIn) {
-			if (!buttonIn) {
-				pressedDown = true;
-			}
-			buttonIn = val;
-		}
-		inputMutex.unlock();
-		if (onButton && pressedDown) {
-			onButton(buttonIn);
-		}
+		// int val = digitalRead(29); //Physical Pin 40, run "gpio readall" for pin details
+		// bool pressedDown = false;
+		// inputMutex.lock();
+		// if (val != buttonIn) {
+		// 	if (!buttonIn) {
+		// 		pressedDown = true;
+		// 	}
+		// 	buttonIn = val;
+		// }
+		// inputMutex.unlock();
+		// if (onButton && pressedDown) {
+		// 	onButton(buttonIn);
+		// }
 		//printf("Button%d\n", buttonIn);
+
+		readSwitches();
 	}
 
 	return true;

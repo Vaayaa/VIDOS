@@ -57,6 +57,7 @@ Pair VIDOS with an external LFO for slow morphing changes or patch in your modul
 8. git clone https://github.com/teafella/VIDOS
 59. ./install.sh
 
+
 ## Controlling the Shader (OSC SETUP)
 1. Make sure your phone/pi are connected to thesame wifi network
 2. Open A Lemur/TouchOSC layout on your phone
