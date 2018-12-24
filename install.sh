@@ -9,10 +9,13 @@ git submodule update --init --recursive
 sudo apt-get install libsoil-dev libasound2-dev cmake
 make
 
-cd /lib/oscpack
+cd lib/oscpack
 sudo make
 sudo make install
 
+cd ..
+cd ..
+
 echo "SETTING VIDOS TO RUN ON STARTUP."
-echo "$DIR/main.out"  | sudo tee -a filename /home/pi/.bashrc
+echo "$DIR/main.out"  | sudo tee -a /home/pi/.bashrc
 ./main.out
